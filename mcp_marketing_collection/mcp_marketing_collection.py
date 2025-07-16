@@ -18,12 +18,13 @@ from silvaengine_utility import Utility
 # Global variable to store schemas
 _SCHEMAS = {}
 
+
 def initialize_aws_lambda_client(setting: Dict[str, Any]) -> Any:
     """
     Initialize the AWS Lambda client using the provided credentials or default configuration.
     """
     region_name = setting.get("region_name")
-    aws_access_key_id = setting.get("aws_access_key_id") 
+    aws_access_key_id = setting.get("aws_access_key_id")
     aws_secret_access_key = setting.get("aws_secret_access_key")
 
     if region_name and aws_access_key_id and aws_secret_access_key:
@@ -37,9 +38,10 @@ def initialize_aws_lambda_client(setting: Dict[str, Any]) -> Any:
         aws_lambda = boto3.client("lambda")
     return aws_lambda
 
+
 def fetch_graphql_schema(
     logger: Any,
-    endpoint_id: str, 
+    endpoint_id: str,
     function_name: str,
     setting: Dict[str, Any],
 ) -> Dict[str, Any]:
@@ -55,11 +57,12 @@ def fetch_graphql_schema(
         )
     return _SCHEMAS[function_name]
 
+
 def execute_graphql_query(
     logger: Any,
     endpoint_id: str,
     function_name: str,
-    operation_name: str, 
+    operation_name: str,
     operation_type: str,
     variables: Dict[str, Any],
     setting: Dict[str, Any],
@@ -76,15 +79,14 @@ def execute_graphql_query(
         aws_lambda=initialize_aws_lambda_client(setting),
     )
 
+
 def get_google_place_setting(
-    logger: logging.Logger,
-    setting: Dict[str, Any],
-    **arguments: Dict[str, Any]
+    logger: logging.Logger, setting: Dict[str, Any], **arguments: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Get Google Place API settings for marketing collection."""
     try:
         logger.info(f"Arguments: {arguments}")
-        
+        logger.info(f"Setting: {setting}")
         return {
             "keyword": setting["keyword"],
             "google_api_key": setting["google_api_key"],
@@ -94,10 +96,9 @@ def get_google_place_setting(
         logger.error(log)
         raise e
 
+
 def get_question_group(
-    logger: logging.Logger,
-    setting: Dict[str, Any],
-    **arguments: Dict[str, Any]
+    logger: logging.Logger, setting: Dict[str, Any], **arguments: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Get question group for a place."""
     try:
@@ -151,10 +152,9 @@ def get_question_group(
         logger.error(log)
         raise e
 
+
 def get_contact_profile(
-    logger: logging.Logger,
-    setting: Dict[str, Any],
-    **arguments: Dict[str, Any]
+    logger: logging.Logger, setting: Dict[str, Any], **arguments: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Get or create contact profile."""
     try:
@@ -210,10 +210,9 @@ def get_contact_profile(
         logger.error(log)
         raise e
 
+
 def data_collect(
-    logger: logging.Logger,
-    setting: Dict[str, Any],
-    **arguments: Dict[str, Any]
+    logger: logging.Logger, setting: Dict[str, Any], **arguments: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Collect data and create/update contact profile."""
     try:
@@ -222,9 +221,7 @@ def data_collect(
         place_uuid = arguments["place_uuid"]
         data_collect_dataset = {
             k: (", ".join(v) if isinstance(v, list) else v)
-            for k, v in Utility.json_loads(
-                arguments["data_collect_dataset"]
-            ).items()
+            for k, v in Utility.json_loads(arguments["data_collect_dataset"]).items()
             if v is not None
         }
         email = data_collect_dataset.pop("email", None)
@@ -286,10 +283,9 @@ def data_collect(
         logger.error(log)
         raise e
 
+
 def submit_request(
-    logger: logging.Logger,
-    setting: Dict[str, Any],
-    **arguments: Dict[str, Any]
+    logger: logging.Logger, setting: Dict[str, Any], **arguments: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Submit a contact request."""
     try:
@@ -322,10 +318,9 @@ def submit_request(
         logger.error(log)
         raise e
 
+
 def get_shopify_product_data(
-    logger: logging.Logger,
-    setting: Dict[str, Any],
-    **arguments: Dict[str, Any]
+    logger: logging.Logger, setting: Dict[str, Any], **arguments: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
     """Get Shopify product data for promotion."""
     promotion_products = setting.get("promotion_products", [])
@@ -350,10 +345,7 @@ def get_shopify_product_data(
                     selected_variant = None
                     for variant in product.variants:
                         default_variant = variant
-                        if (
-                            variant.id
-                            == product_handles[product.handle]["variant_id"]
-                        ):
+                        if variant.id == product_handles[product.handle]["variant_id"]:
                             selected_variant = variant
                             break
                     if selected_variant is None:
@@ -382,10 +374,9 @@ def get_shopify_product_data(
         raise e
     return []
 
+
 def place_shopify_draft_order(
-    logger: logging.Logger,
-    setting: Dict[str, Any],
-    **arguments: Dict[str, Any]
+    logger: logging.Logger, setting: Dict[str, Any], **arguments: Dict[str, Any]
 ) -> str:
     """Place a Shopify draft order."""
     promotion_products = setting.get("promotion_products", [])
