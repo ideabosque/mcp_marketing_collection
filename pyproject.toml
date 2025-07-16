@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "mcp-marketing-collection"
+version = "0.0.1"
+description = "MCP Marketing Collection"
+authors = ["Idea Bosque"]
+readme = "README.md"
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+homepage = "https://github.com/ideabosque/mcp_marketing_collection"
+repository = "https://github.com/ideabosque/mcp_marketing_collection"
+
+[tool.poetry.dependencies]
+python = ">=3.8"
+boto3 = "^1.26.0"
+botocore = "^1.29.0"
+pyhumps = "^3.8.0"
+silvaengine-utility = {path = "../silvaengine_utility", develop = true}
+shopify-connector = {path = "../shopify_connector", develop = true}
+
+[tool.poetry.group.dev.dependencies]
+python-dotenv = "^1.0.0"
+pytest = "^7.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
