@@ -6,11 +6,10 @@ __author__ = "bibow"
 
 import logging
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import boto3
 import humps
-from botocore.exceptions import BotoCoreError, NoCredentialsError
 
 from shopify_connector import ShopifyConnector
 from silvaengine_utility import Utility
