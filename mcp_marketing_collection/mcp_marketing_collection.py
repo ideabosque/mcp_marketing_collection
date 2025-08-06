@@ -217,12 +217,12 @@ def data_collect(
     try:
         logger.info(f"Arguments: {arguments}")
         endpoint_id = arguments["endpoint_id"]
-        place_uuid = arguments["place_uuid"]
         data_collect_dataset = {
             k: (", ".join(v) if isinstance(v, list) else v)
             for k, v in Utility.json_loads(arguments["data_collect_dataset"]).items()
             if v is not None
         }
+        place_uuid = data_collect_dataset.pop("place_uuid", None)
         email = data_collect_dataset.pop("email", None)
         first_name = data_collect_dataset.pop("first_name", None)
         last_name = data_collect_dataset.pop("last_name", None)
@@ -276,6 +276,7 @@ def data_collect(
         return {
             "contact_uuid": contact_profile["contact_uuid"],
             "sales_rep": setting["sales_rep"],
+            "sales_rep_email": setting["sales_rep_email"],
         }
     except Exception as e:
         log = traceback.format_exc()
