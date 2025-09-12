@@ -11,7 +11,6 @@ from typing import Any, Dict, List
 import boto3
 import humps
 
-from shopify_connector import ShopifyConnector
 from silvaengine_utility import Utility
 
 
@@ -26,7 +25,6 @@ class MCPMarketingCollection:
         region_name = setting.get("region_name")
         aws_access_key_id = setting.get("aws_access_key_id")
         aws_secret_access_key = setting.get("aws_secret_access_key")
-
         if region_name and aws_access_key_id and aws_secret_access_key:
             return boto3.client(
                 "lambda",
@@ -70,7 +68,7 @@ class MCPMarketingCollection:
             variables,
             setting=self.setting,
             test_mode=self.setting.get("test_mode"),
-            aws_lambda=self._initialize_aws_lambda_client(),
+            aws_lambda=self._aws_lambda,
         )
 
     def get_google_place_setting(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -293,50 +291,63 @@ class MCPMarketingCollection:
         promotion_products = self.setting.get("promotion_products", [])
         if len(promotion_products) == 0:
             return []
-
+        
+        endpoint_id = arguments.get("endpoint_id", None)
+        if endpoint_id is None:
+            return []
         try:
-            shopify_connector = ShopifyConnector(self.logger, **self.setting)
             product_handles = {
                 product_info["handle"]: product_info
                 for product_info in promotion_products
                 if product_info.get("handle") is not None
             }
-            products = shopify_connector.find_products_by_attributes(
-                {"handle": ",".join(list(set(product_handles.keys())))}
+            variables = {
+                "shop": endpoint_id,
+                "attributes": {
+                    "handle": ",".join(list(set(product_handles.keys())))
+                }
+            }
+            result = self._execute_graphql_query(
+                self.setting.get("shopify_endpoint_id", "openai"),
+                "shopify_app_engine_graphql",
+                "productList",
+                "Query",
+                variables,
             )
-            if products is not None:
+
+            products =  result.get("productList",{}).get("productList", [])
+            if len(products) > 0:
                 products_data = []
                 for product in products:
-                    if product.handle in product_handles:
+                    if product.get("handle") in product_handles:
                         default_variant = None
                         selected_variant = None
-                        for variant in product.variants:
+                        for variant in product.get("variants", []):
                             default_variant = variant
                             if (
-                                variant.id
-                                == product_handles[product.handle]["variant_id"]
+                                variant.get("id")
+                                == product_handles[product.get("handle")]["variant_id"]
                             ):
                                 selected_variant = variant
                                 break
                         if selected_variant is None:
                             selected_variant = default_variant
-                        if len(product.variants) == 1:
-                            title = "{title}".format(title=product.title)
+                        if len(product.get("variants", [])) == 1:
+                            title = "{title}".format(title=product.get("title"))
                         else:
                             title = "{title} - {variant_title}".format(
-                                title=product.title,
-                                variant_title=selected_variant.title,
+                                title=product.get("title"),
+                                variant_title=selected_variant.get("title"),
                             )
-                        price = selected_variant.price
+                        price = selected_variant.get("price")
                         products_data.append(
                             {
                                 "title": title,
-                                "handle": product.handle,
+                                "handle": product.get("handle"),
                                 "price": price,
-                                "body_html": product.body_html,
+                                "body_html": product.get("bodyHtml"),
                             }
                         )
-
                 return products_data
         except Exception as e:
             log = traceback.format_exc()
@@ -349,8 +360,12 @@ class MCPMarketingCollection:
         promotion_products = self.setting.get("promotion_products", [])
         if len(promotion_products) == 0:
             raise Exception("No promotion products found")
+        
+        endpoint_id = arguments.get("endpoint_id", None)
+        if endpoint_id is None:
+            raise Exception("No endpoint id provided")
+        
         try:
-            shopify_connector = ShopifyConnector(self.logger, **self.setting)
             contact = arguments["contact"]
             email = contact["email"]
             shipping_address = arguments.get("shipping_address")
@@ -367,9 +382,23 @@ class MCPMarketingCollection:
                         "quantity": item.get("quantity", 1),
                     }
                 )
-            return shopify_connector.create_draft_order(
-                email, line_items, shipping_address, billing_address
+            variables = {
+                "shop": endpoint_id,
+                "email": email,
+                "lineItems": line_items,
+                "shippingAddress": shipping_address,
+                "billingAddress": billing_address
+            }
+            result = self._execute_graphql_query(
+                self.setting.get("shopify_endpoint_id","openai"),
+                "shopify_app_engine_graphql",
+                "createDraftOrder",
+                "Mutation",
+                variables,
             )
+            if result.get("createDraftOrder",{}).get("draftOrder"):
+                return result.get("createDraftOrder",{}).get("draftOrder")
+            return None
         except Exception as e:
             log = traceback.format_exc()
             self.logger.error(log)
