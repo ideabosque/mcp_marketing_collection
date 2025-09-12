@@ -71,6 +71,7 @@ class MCPMarketingCollection:
             aws_lambda=self._aws_lambda,
         )
 
+    # * MCP Function.
     def get_google_place_setting(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Get Google Place API settings for marketing collection."""
         try:
@@ -85,6 +86,7 @@ class MCPMarketingCollection:
             self.logger.error(log)
             raise e
 
+    # * MCP Function.
     def get_question_group(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Get question group for a place."""
         try:
@@ -134,6 +136,7 @@ class MCPMarketingCollection:
             self.logger.error(log)
             raise e
 
+    # * MCP Function.
     def get_contact_profile(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Get or create contact profile."""
         try:
@@ -185,6 +188,7 @@ class MCPMarketingCollection:
             self.logger.error(log)
             raise e
 
+    # * MCP Function.
     def data_collect(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Collect data and create/update contact profile."""
         try:
@@ -254,6 +258,7 @@ class MCPMarketingCollection:
             self.logger.error(log)
             raise e
 
+    # * MCP Function.
     def submit_request(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Submit a contact request."""
         try:
@@ -284,6 +289,7 @@ class MCPMarketingCollection:
             self.logger.error(log)
             raise e
 
+    # * MCP Function.
     def get_shopify_product_data(
         self, **arguments: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
@@ -291,7 +297,7 @@ class MCPMarketingCollection:
         promotion_products = self.setting.get("promotion_products", [])
         if len(promotion_products) == 0:
             return []
-        
+
         endpoint_id = arguments.get("endpoint_id", None)
         if endpoint_id is None:
             return []
@@ -303,9 +309,7 @@ class MCPMarketingCollection:
             }
             variables = {
                 "shop": endpoint_id,
-                "attributes": {
-                    "handle": ",".join(list(set(product_handles.keys())))
-                }
+                "attributes": {"handle": ",".join(list(set(product_handles.keys())))},
             }
             result = self._execute_graphql_query(
                 self.setting.get("shopify_endpoint_id", "openai"),
@@ -315,7 +319,7 @@ class MCPMarketingCollection:
                 variables,
             )
 
-            products =  result.get("productList",{}).get("productList", [])
+            products = result.get("productList", {}).get("productList", [])
             if len(products) > 0:
                 products_data = []
                 for product in products:
@@ -355,16 +359,17 @@ class MCPMarketingCollection:
             raise e
         return []
 
+    # * MCP Function.
     def place_shopify_draft_order(self, **arguments: Dict[str, Any]) -> str:
         """Place a Shopify draft order."""
         promotion_products = self.setting.get("promotion_products", [])
         if len(promotion_products) == 0:
             raise Exception("No promotion products found")
-        
+
         endpoint_id = arguments.get("endpoint_id", None)
         if endpoint_id is None:
             raise Exception("No endpoint id provided")
-        
+
         try:
             contact = arguments["contact"]
             email = contact["email"]
@@ -387,17 +392,17 @@ class MCPMarketingCollection:
                 "email": email,
                 "lineItems": line_items,
                 "shippingAddress": shipping_address,
-                "billingAddress": billing_address
+                "billingAddress": billing_address,
             }
             result = self._execute_graphql_query(
-                self.setting.get("shopify_endpoint_id","openai"),
+                self.setting.get("shopify_endpoint_id", "openai"),
                 "shopify_app_engine_graphql",
                 "createDraftOrder",
                 "Mutation",
                 variables,
             )
-            if result.get("createDraftOrder",{}).get("draftOrder"):
-                return result.get("createDraftOrder",{}).get("draftOrder")
+            if result.get("createDraftOrder", {}).get("draftOrder"):
+                return result.get("createDraftOrder", {}).get("draftOrder")
             return None
         except Exception as e:
             log = traceback.format_exc()
