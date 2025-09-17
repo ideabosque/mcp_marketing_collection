@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 
 import boto3
 import humps
-
+import re
 from silvaengine_utility import Utility
 
 
@@ -371,14 +371,20 @@ class MCPMarketingCollection:
             shipping_address = arguments.get("shipping_address")
             billing_address = arguments.get("billing_address")
 
-            items = self.setting["promotion_products"]
+            items = arguments.get("items", [])
             line_items = []
             for item in items:
                 if item.get("variant_id") is None:
                     continue
+                variant_id = None
+                match = re.search(r"\d+", item.get("variant_id"))
+                if match:
+                    variant_id = match.group()
+                if variant_id is None:
+                    continue
                 line_items.append(
                     {
-                        "variant_id": item.get("variant_id"),
+                        "variant_id": variant_id,
                         "quantity": item.get("quantity", 1),
                     }
                 )
