@@ -5,13 +5,256 @@ from __future__ import annotations
 __author__ = "bibow"
 
 import logging
+import re
 import traceback
 from typing import Any, Dict, List
 
 import boto3
 import humps
-import re
+
 from silvaengine_utility import Utility
+
+MCP_CONFIGURATION = {
+    "tools": [
+        {
+            "name": "get_google_place_setting",
+            "description": "Get Google Place API settings for marketing collection",
+            "inputSchema": {"type": "object", "properties": {}, "required": []},
+            "annotations": None,
+        },
+        {
+            "name": "get_question_group",
+            "description": "Get question group for a place",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "place_uuid": {"type": "string", "description": "UUID of the place"}
+                },
+                "required": ["place_uuid"],
+            },
+            "annotations": None,
+        },
+        {
+            "name": "get_contact_profile",
+            "description": "Get or create contact profile",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "description": "Contact information",
+                        "properties": {
+                            "email": {"type": "string"},
+                            "first_name": {"type": "string"},
+                            "last_name": {"type": "string"},
+                        },
+                        "required": ["email"],
+                    },
+                    "place": {
+                        "type": "object",
+                        "description": "Place information",
+                        "properties": {"place_uuid": {"type": "string"}},
+                        "required": ["place_uuid"],
+                    },
+                },
+                "required": ["contact", "place"],
+            },
+            "annotations": None,
+        },
+        {
+            "name": "data_collect",
+            "description": "Collect data and create/update contact profile",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "data_collect_dataset": {
+                        "type": "string",
+                        "description": "JSON string containing collected data including place_uuid, email, first_name, last_name and other fields",
+                    }
+                },
+                "required": ["data_collect_dataset"],
+            },
+            "annotations": None,
+        },
+        {
+            "name": "submit_request",
+            "description": "Submit a contact request",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "place_uuid": {
+                        "type": "string",
+                        "description": "UUID of the place",
+                    },
+                    "contact_uuid": {
+                        "type": "string",
+                        "description": "UUID of the contact",
+                    },
+                    "request_title": {
+                        "type": "string",
+                        "description": "Title of the request",
+                    },
+                    "request_detail": {
+                        "type": "string",
+                        "description": "Detailed description of the request",
+                    },
+                },
+                "required": [
+                    "place_uuid",
+                    "contact_uuid",
+                    "request_title",
+                    "request_detail",
+                ],
+            },
+            "annotations": None,
+        },
+        {
+            "name": "get_shopify_product_data",
+            "description": "Get Shopify product data for promotion",
+            "inputSchema": {"type": "object", "properties": {}, "required": []},
+            "annotations": None,
+        },
+        {
+            "name": "place_shopify_draft_order",
+            "description": "Place a Shopify draft order",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "description": "Contact information",
+                        "properties": {"email": {"type": "string"}},
+                        "required": ["email"],
+                    },
+                    "shipping_address": {
+                        "type": "object",
+                        "description": "Shipping address information",
+                        "properties": {
+                            "address1": {"type": "string"},
+                            "address2": {"type": "string"},
+                            "city": {"type": "string"},
+                            "province_code": {"type": "string"},
+                            "province": {"type": "string"},
+                            "zip": {"type": "string"},
+                            "country": {"type": "string"},
+                            "country_code": {"type": "string"},
+                            "company": {"type": "string"},
+                            "first_name": {"type": "string"},
+                            "last_name": {"type": "string"},
+                            "phone": {"type": "string"},
+                        },
+                    },
+                    "billing_address": {
+                        "type": "object",
+                        "description": "Billing address information",
+                        "properties": {
+                            "address1": {"type": "string"},
+                            "address2": {"type": "string"},
+                            "city": {"type": "string"},
+                            "province_code": {"type": "string"},
+                            "province": {"type": "string"},
+                            "zip": {"type": "string"},
+                            "country": {"type": "string"},
+                            "country_code": {"type": "string"},
+                            "company": {"type": "string"},
+                            "first_name": {"type": "string"},
+                            "last_name": {"type": "string"},
+                            "phone": {"type": "string"},
+                        },
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "variant_id": {"type": "string"},
+                                "quantity": {"type": "integer"},
+                            },
+                        },
+                        "description": "Array of line items for the draft order",
+                    },
+                },
+                "required": ["contact"],
+            },
+            "annotations": None,
+        },
+    ],
+    "resources": [],
+    "prompts": [],
+    "module_links": [
+        {
+            "type": "tool",
+            "name": "get_google_place_setting",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "function_name": "get_google_place_setting",
+            "return_type": "text",
+        },
+        {
+            "type": "tool",
+            "name": "get_question_group",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "function_name": "get_question_group",
+            "return_type": "text",
+        },
+        {
+            "type": "tool",
+            "name": "get_contact_profile",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "function_name": "get_contact_profile",
+            "return_type": "text",
+        },
+        {
+            "type": "tool",
+            "name": "data_collect",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "function_name": "data_collect",
+            "return_type": "text",
+        },
+        {
+            "type": "tool",
+            "name": "submit_request",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "function_name": "submit_request",
+            "return_type": "text",
+        },
+        {
+            "type": "tool",
+            "name": "get_shopify_product_data",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "function_name": "get_shopify_product_data",
+            "return_type": "text",
+        },
+        {
+            "type": "tool",
+            "name": "place_shopify_draft_order",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "function_name": "place_shopify_draft_order",
+            "return_type": "text",
+        },
+    ],
+    "modules": [
+        {
+            "package_name": "mcp_marketing_collection",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "setting": {
+                "keyword": "marketing",
+                "google_api_key": "<google_api_key>",
+                "sales_rep": "Marketing Team",
+                "sales_rep_email": "marketing@company.com",
+                "shopify_endpoint_id": "shopify_store",
+                "promotion_products": [],
+            },
+        }
+    ],
+}
 
 
 class MCPMarketingCollection:

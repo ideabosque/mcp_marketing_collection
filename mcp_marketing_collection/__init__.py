@@ -3,8 +3,6 @@
 
 __author__ = "bibow"
 
-from .mcp_marketing_collection import MCPMarketingCollection
+from .mcp_marketing_collection import MCP_CONFIGURATION, MCPMarketingCollection
 
-__all__ = [
-    "MCPMarketingCollection",
-]
+__all__ = ["MCPMarketingCollection", "MCP_CONFIGURATION"]
