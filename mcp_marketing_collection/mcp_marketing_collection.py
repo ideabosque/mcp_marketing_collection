@@ -456,7 +456,6 @@ class MCPMarketingCollection:
                 "contactProfileList",
                 "Query",
                 {
-                    "placeUuid": place_uuid,
                     "email": email,
                 },
             )
