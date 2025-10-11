@@ -57,7 +57,7 @@ MCP_CONFIGURATION = {
                         "required": ["place_uuid"],
                     },
                 },
-                "required": ["contact", "place"],
+                "required": ["contact"],
             },
             "annotations": None,
         },
@@ -261,8 +261,17 @@ class MCPMarketingCollection:
     def __init__(self, logger: logging.Logger, **setting: Dict[str, Any]):
         self.logger = logger
         self.setting = setting
+        self._endpoint_id = None
         self._schemas = {}
         self._aws_lambda = self._initialize_aws_lambda_client(**setting)
+
+    @property
+    def endpoint_id(self) -> str:
+        return self._endpoint_id
+
+    @endpoint_id.setter
+    def endpoint_id(self, value: str):
+        self._endpoint_id = value
 
     def _initialize_aws_lambda_client(self, **setting: Dict[str, Any]) -> boto3.client:
         region_name = setting.get("region_name")
@@ -280,13 +289,12 @@ class MCPMarketingCollection:
 
     def _fetch_graphql_schema(
         self,
-        endpoint_id: str,
         function_name: str,
     ) -> Dict[str, Any]:
         if self._schemas.get(function_name) is None:
             self._schemas[function_name] = Utility.fetch_graphql_schema(
                 self.logger,
-                endpoint_id,
+                self.endpoint_id,
                 function_name,
                 setting=self.setting,
                 test_mode=self.setting.get("test_mode"),
@@ -296,16 +304,15 @@ class MCPMarketingCollection:
 
     def _execute_graphql_query(
         self,
-        endpoint_id: str,
         function_name: str,
         operation_name: str,
         operation_type: str,
         variables: Dict[str, Any],
     ) -> Dict[str, Any]:
-        schema = self._fetch_graphql_schema(endpoint_id, function_name)
+        schema = self._fetch_graphql_schema(function_name)
         return Utility.execute_graphql_query(
             self.logger,
-            endpoint_id,
+            self.endpoint_id,
             function_name,
             Utility.generate_graphql_operation(operation_name, operation_type, schema),
             variables,
@@ -334,10 +341,8 @@ class MCPMarketingCollection:
         """Get question group for a place."""
         try:
             self.logger.info(f"Arguments: {arguments}")
-            endpoint_id = arguments["endpoint_id"]
             place_uuid = arguments["place_uuid"]
             result = self._execute_graphql_query(
-                endpoint_id,
                 "ai_marketing_graphql",
                 "questionGroupList",
                 "Query",
@@ -345,7 +350,6 @@ class MCPMarketingCollection:
             )
             if result["questionGroupList"]["total"] == 0:
                 result = self._execute_graphql_query(
-                    endpoint_id,
                     "ai_marketing_graphql",
                     "questionGroupList",
                     "Query",
@@ -384,15 +388,13 @@ class MCPMarketingCollection:
         """Get or create contact profile."""
         try:
             self.logger.info(f"Arguments: {arguments}")
-            endpoint_id = arguments["endpoint_id"]
             contact = arguments["contact"]
-            place = arguments["place"]
+            place = arguments.get("place", {})
             variables = {
                 "email": contact["email"],
-                "placeUuid": place["place_uuid"],
+                "placeUuid": place.get("place_uuid"),
             }
             result = self._execute_graphql_query(
-                endpoint_id,
                 "ai_marketing_graphql",
                 "contactProfileList",
                 "Query",
@@ -415,7 +417,6 @@ class MCPMarketingCollection:
                 }
             )
             result = self._execute_graphql_query(
-                endpoint_id,
                 "ai_marketing_graphql",
                 "insertUpdateContactProfile",
                 "Mutation",
@@ -436,7 +437,6 @@ class MCPMarketingCollection:
         """Collect data and create/update contact profile."""
         try:
             self.logger.info(f"Arguments: {arguments}")
-            endpoint_id = arguments["endpoint_id"]
             data_collect_dataset = {
                 k: (", ".join(v) if isinstance(v, list) else v)
                 for k, v in Utility.json_loads(
@@ -451,7 +451,6 @@ class MCPMarketingCollection:
             data_collect_dataset.update({"sales_rep": self.setting["sales_rep"]})
 
             result = self._execute_graphql_query(
-                endpoint_id,
                 "ai_marketing_graphql",
                 "contactProfileList",
                 "Query",
@@ -479,7 +478,6 @@ class MCPMarketingCollection:
                 variables.update({"contactUuid": contact_uuid})
 
             result = self._execute_graphql_query(
-                endpoint_id,
                 "ai_marketing_graphql",
                 "insertUpdateContactProfile",
                 "Mutation",
@@ -505,7 +503,6 @@ class MCPMarketingCollection:
         """Submit a contact request."""
         try:
             self.logger.info(f"Arguments: {arguments}")
-            endpoint_id = arguments["endpoint_id"]
 
             variables = {
                 "placeUuid": arguments["place_uuid"],
@@ -515,7 +512,6 @@ class MCPMarketingCollection:
                 "updatedBy": "Admin",
             }
             result = self._execute_graphql_query(
-                endpoint_id,
                 "ai_marketing_graphql",
                 "insertUpdateContactRequest",
                 "Mutation",
@@ -540,9 +536,6 @@ class MCPMarketingCollection:
         if len(promotion_products) == 0:
             return []
 
-        endpoint_id = arguments.get("endpoint_id", None)
-        if endpoint_id is None:
-            return []
         try:
             product_handles = {
                 product_info["handle"]: product_info
@@ -550,11 +543,10 @@ class MCPMarketingCollection:
                 if product_info.get("handle") is not None
             }
             variables = {
-                "shop": endpoint_id,
+                "shop": self.endpoint_id,
                 "attributes": {"handle": ",".join(list(set(product_handles.keys())))},
             }
             result = self._execute_graphql_query(
-                self.setting.get("shopify_endpoint_id", "openai"),
                 "shopify_app_engine_graphql",
                 "productList",
                 "Query",
@@ -608,10 +600,6 @@ class MCPMarketingCollection:
         if len(promotion_products) == 0:
             raise Exception("No promotion products found")
 
-        endpoint_id = arguments.get("endpoint_id", None)
-        if endpoint_id is None:
-            raise Exception("No endpoint id provided")
-
         try:
             contact = arguments["contact"]
             email = contact["email"]
@@ -636,14 +624,13 @@ class MCPMarketingCollection:
                     }
                 )
             variables = {
-                "shop": endpoint_id,
+                "shop": self.endpoint_id,
                 "email": email,
                 "lineItems": line_items,
                 "shippingAddress": shipping_address,
                 "billingAddress": billing_address,
             }
             result = self._execute_graphql_query(
-                self.setting.get("shopify_endpoint_id", "openai"),
                 "shopify_app_engine_graphql",
                 "createDraftOrder",
                 "Mutation",
