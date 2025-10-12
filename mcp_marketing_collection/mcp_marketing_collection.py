@@ -11,6 +11,7 @@ from typing import Any, Dict, List
 
 import boto3
 import humps
+import pendulum
 
 from silvaengine_utility import Utility
 
@@ -20,6 +21,38 @@ MCP_CONFIGURATION = {
             "name": "get_google_place_setting",
             "description": "Get Google Place API settings for marketing collection",
             "inputSchema": {"type": "object", "properties": {}, "required": []},
+            "annotations": None,
+        },
+        {
+            "name": "get_place",
+            "description": "Get or create a place by location and business details",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "region": {"type": "string", "description": "Region identifier"},
+                    "latitude": {
+                        "type": "number",
+                        "description": "Latitude coordinate",
+                    },
+                    "longitude": {
+                        "type": "number",
+                        "description": "Longitude coordinate",
+                    },
+                    "address": {"type": "string", "description": "Full address"},
+                    "business_name": {
+                        "type": "string",
+                        "description": "Name of the business",
+                    },
+                    "phone_number": {"type": "string", "description": "Phone number"},
+                    "website": {"type": "string", "description": "Website URL"},
+                    "types": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Array of business types",
+                    },
+                },
+                "required": ["region", "latitude", "longitude", "address"],
+            },
             "annotations": None,
         },
         {
@@ -192,6 +225,14 @@ MCP_CONFIGURATION = {
         },
         {
             "type": "tool",
+            "name": "get_place",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "function_name": "get_place",
+            "return_type": "text",
+        },
+        {
+            "type": "tool",
             "name": "get_question_group",
             "module_name": "mcp_marketing_collection",
             "class_name": "MCPMarketingCollection",
@@ -337,6 +378,62 @@ class MCPMarketingCollection:
             raise e
 
     # * MCP Function.
+    def get_place(self, **arguments: Dict[str, any]) -> Dict[str, Any]:
+        """ """
+        try:
+            self.logger.info(f"Arguments: {arguments}")
+            variables = {
+                "region": arguments["region"],
+                "latitude": arguments["latitude"],
+                "longitude": arguments["longitude"],
+                "address": arguments["address"],
+            }
+            result = self._execute_graphql_query(
+                "ai_marketing_graphql",
+                "placeList",
+                "Query",
+                variables,
+            )
+            if result["placeList"]["total"] > 0:
+                place = humps.decamelize(result["placeList"]["placeList"][0])
+                variables.update({"placeUuid": place["place_uuid"]})
+
+                if all(
+                    [
+                        place.get("business_name") == arguments.get("business_name"),
+                        place.get("phone_number") == arguments.get("phone_number"),
+                        place.get("website") == arguments.get("website"),
+                        sorted(place.get("types", []))
+                        == sorted(arguments.get("types", [])),
+                    ]
+                ):
+                    return place
+
+            variables.update(
+                {
+                    "businessName": arguments.get("business_name"),
+                    "phoneNumber": arguments.get("phone_number"),
+                    "website": arguments.get("website"),
+                    "types": arguments.get("types", []),
+                    "updatedBy": "Admin",
+                }
+            )
+            result = self._execute_graphql_query(
+                "ai_marketing_graphql",
+                "insertUpdatePlace",
+                "Mutation",
+                variables,
+            )
+            place = humps.decamelize(result["insertUpdatePlace"]["place"])
+
+            return place
+
+        except Exception as e:
+            log = traceback.format_exc()
+            self.logger.error(log)
+            raise e
+
+    # * MCP Function.
     def get_question_group(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Get question group for a place."""
         try:
@@ -392,7 +489,6 @@ class MCPMarketingCollection:
             place = arguments.get("place", {})
             variables = {
                 "email": contact["email"],
-                "placeUuid": place.get("place_uuid"),
             }
             result = self._execute_graphql_query(
                 "ai_marketing_graphql",
@@ -404,15 +500,23 @@ class MCPMarketingCollection:
                 contact_profile = humps.decamelize(
                     result["contactProfileList"]["contactProfileList"][0]
                 )
-                return contact_profile
+                variables.update({"contactUuid": contact_profile["contact_uuid"]})
+
+                if all(
+                    [
+                        contact_profile.get("first_name") == contact["first_name"],
+                        contact_profile.get("last_name") == contact["last_name"],
+                        contact_profile["place"].get("place_uuid")
+                        == place.get("place_uuid"),
+                    ]
+                ):
+                    return contact_profile
 
             variables.update(
                 {
                     "firstName": contact["first_name"],
                     "lastName": contact["last_name"],
-                    "data": {
-                        "sales_rep": self.setting["sales_rep"],
-                    },
+                    "placeUuid": place.get("place_uuid"),
                     "updatedBy": "Admin",
                 }
             )
@@ -526,72 +630,6 @@ class MCPMarketingCollection:
             log = traceback.format_exc()
             self.logger.error(log)
             raise e
-
-    # * MCP Function.
-    def get_shopify_product_data(
-        self, **arguments: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Get Shopify product data for promotion."""
-        promotion_products = self.setting.get("promotion_products", [])
-        if len(promotion_products) == 0:
-            return []
-
-        try:
-            product_handles = {
-                product_info["handle"]: product_info
-                for product_info in promotion_products
-                if product_info.get("handle") is not None
-            }
-            variables = {
-                "shop": self.endpoint_id,
-                "attributes": {"handle": ",".join(list(set(product_handles.keys())))},
-            }
-            result = self._execute_graphql_query(
-                "shopify_app_engine_graphql",
-                "productList",
-                "Query",
-                variables,
-            )
-
-            products = result.get("productList", {}).get("productList", [])
-            if len(products) > 0:
-                products_data = []
-                for product in products:
-                    if product.get("handle") in product_handles:
-                        default_variant = None
-                        selected_variant = None
-                        for variant in product.get("variants", []):
-                            default_variant = variant
-                            if (
-                                variant.get("id")
-                                == product_handles[product.get("handle")]["variant_id"]
-                            ):
-                                selected_variant = variant
-                                break
-                        if selected_variant is None:
-                            selected_variant = default_variant
-                        if len(product.get("variants", [])) == 1:
-                            title = "{title}".format(title=product.get("title"))
-                        else:
-                            title = "{title} - {variant_title}".format(
-                                title=product.get("title"),
-                                variant_title=selected_variant.get("title"),
-                            )
-                        price = selected_variant.get("price")
-                        products_data.append(
-                            {
-                                "title": title,
-                                "handle": product.get("handle"),
-                                "price": price,
-                                "body_html": product.get("bodyHtml"),
-                            }
-                        )
-                return products_data
-        except Exception as e:
-            log = traceback.format_exc()
-            self.logger.error(log)
-            raise e
-        return []
 
     # * MCP Function.
     def place_shopify_draft_order(self, **arguments: Dict[str, Any]) -> str:
