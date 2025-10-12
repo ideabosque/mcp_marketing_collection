@@ -332,16 +332,23 @@ class MCPMarketingCollection:
         self,
         function_name: str,
     ) -> Dict[str, Any]:
-        if self._schemas.get(function_name) is None:
-            self._schemas[function_name] = Utility.fetch_graphql_schema(
-                self.logger,
-                self.endpoint_id,
-                function_name,
-                setting=self.setting,
-                test_mode=self.setting.get("test_mode"),
-                aws_lambda=self._aws_lambda,
+        try:
+            if self._schemas.get(function_name) is None:
+                self._schemas[function_name] = Utility.fetch_graphql_schema(
+                    self.logger,
+                    self.endpoint_id,
+                    function_name,
+                    setting=self.setting,
+                    execute_mode=self.setting.get("execute_mode"),
+                    aws_lambda=self._aws_lambda,
+                )
+            return self._schemas[function_name]
+        except Exception as e:
+            log = traceback.format_exc()
+            self.logger.error(log)
+            raise Exception(
+                f"Failed to fetch GraphQL schema: {function_name}/{self.endpoint_id}. Please check the configuration and ensure all required settings are properly. Error: {e}"
             )
-        return self._schemas[function_name]
 
     def _execute_graphql_query(
         self,
@@ -350,21 +357,28 @@ class MCPMarketingCollection:
         operation_type: str,
         variables: Dict[str, Any],
     ) -> Dict[str, Any]:
-        schema = self._fetch_graphql_schema(function_name)
-        query = Utility.generate_graphql_operation(
-            operation_name, operation_type, schema
-        )
-        self.logger.info(f"Query: {query}")
-        return Utility.execute_graphql_query(
-            self.logger,
-            self.endpoint_id,
-            function_name,
-            query,
-            variables,
-            setting=self.setting,
-            test_mode=self.setting.get("test_mode"),
-            aws_lambda=self._aws_lambda,
-        )
+        try:
+            schema = self._fetch_graphql_schema(function_name)
+            query = Utility.generate_graphql_operation(
+                operation_name, operation_type, schema
+            )
+            self.logger.info(f"Query: {query}/{function_name}")
+            return Utility.execute_graphql_query(
+                self.logger,
+                self.endpoint_id,
+                function_name,
+                query,
+                variables,
+                setting=self.setting,
+                execute_mode=self.setting.get("execute_mode"),
+                aws_lambda=self._aws_lambda,
+            )
+        except Exception as e:
+            log = traceback.format_exc()
+            self.logger.error(log)
+            raise Exception(
+                f"Failed to execute GraphQL query ({function_name}/{self.endpoint_id}). Error: {e}"
+            )
 
     # * MCP Function.
     def get_google_place_setting(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
