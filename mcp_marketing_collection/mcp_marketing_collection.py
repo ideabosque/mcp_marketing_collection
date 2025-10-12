@@ -638,10 +638,6 @@ class MCPMarketingCollection:
     # * MCP Function.
     def place_shopify_draft_order(self, **arguments: Dict[str, Any]) -> str:
         """Place a Shopify draft order."""
-        promotion_products = self.setting.get("promotion_products", [])
-        if len(promotion_products) == 0:
-            raise Exception("No promotion products found")
-
         try:
             contact = arguments["contact"]
             email = contact["email"]
