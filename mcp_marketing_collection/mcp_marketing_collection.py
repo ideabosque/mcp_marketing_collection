@@ -351,11 +351,15 @@ class MCPMarketingCollection:
         variables: Dict[str, Any],
     ) -> Dict[str, Any]:
         schema = self._fetch_graphql_schema(function_name)
+        query = Utility.generate_graphql_operation(
+            operation_name, operation_type, schema
+        )
+        self.logger.info(f"Query: {query}")
         return Utility.execute_graphql_query(
             self.logger,
             self.endpoint_id,
             function_name,
-            Utility.generate_graphql_operation(operation_name, operation_type, schema),
+            query,
             variables,
             setting=self.setting,
             test_mode=self.setting.get("test_mode"),
