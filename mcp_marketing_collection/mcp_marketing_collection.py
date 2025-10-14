@@ -695,3 +695,36 @@ class MCPMarketingCollection:
             log = traceback.format_exc()
             self.logger.error(log)
             raise e
+        
+    # * MCP Function.
+    def get_shopify_customer(self, **arguments: Dict[str, Any]) -> str:
+        """get a Shopify customer."""
+        try:
+            contact = arguments["contact"]
+            email = contact["email"]
+            first_name = contact.get("first_name")
+            last_name = contact.get("last_name")
+            phone = contact.get("phone")
+            address = arguments.get("address")
+            
+            variables = {
+                "shop": self.endpoint_id,
+                "email": email,
+                "firstName": first_name,
+                "LastName": last_name,
+                "phone": phone,
+                "address": address
+            }
+            result = self._execute_graphql_query(
+                "shopify_app_engine_graphql",
+                "customer",
+                "Query",
+                variables,
+            )
+            if result.get("customer"):
+                return result.get("customer")
+            return None
+        except Exception as e:
+            log = traceback.format_exc()
+            self.logger.error(log)
+            raise e
