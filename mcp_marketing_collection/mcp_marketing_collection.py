@@ -775,21 +775,26 @@ class MCPMarketingCollection:
                 "firstName": first_name,
                 "LastName": last_name,
                 "phone": phone,
-                "address": {
-                    "address1": address.get("address1"),
-                    "address2": address.get("address2"),
-                    "city": address.get("city"),
-                    "province_code": address.get("province_code"),
-                    "province": address.get("province"),
-                    "zip": address.get("zip"),
-                    "country": address.get("country"),
-                    "country_code": address.get("country_code"),
-                    "company": address.get("company"),
-                    "first_name": address.get("first_name"),
-                    "last_name": address.get("last_name"),
-                    "phone": address.get("phone"),
-                },
             }
+            if address:
+                variables.update(
+                    {
+                        "address": {
+                            "address1": address.get("address1"),
+                            "address2": address.get("address2"),
+                            "city": address.get("city"),
+                            "province_code": address.get("province_code"),
+                            "province": address.get("province"),
+                            "zip": address.get("zip"),
+                            "country": address.get("country"),
+                            "country_code": address.get("country_code"),
+                            "company": address.get("company"),
+                            "first_name": address.get("first_name"),
+                            "last_name": address.get("last_name"),
+                            "phone": address.get("phone"),
+                        }
+                    }
+                )
             result = self._execute_graphql_query(
                 "shopify_app_engine_graphql",
                 "customer",
