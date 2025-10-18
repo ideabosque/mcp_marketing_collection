@@ -759,7 +759,7 @@ class MCPMarketingCollection:
             first_name = contact.get("first_name")
             last_name = contact.get("last_name")
             phone = contact.get("phone")
-            address = arguments.get("address")
+            address = arguments.get("address", {})
 
             contact_profile = self.get_contact_profile(
                 **{
