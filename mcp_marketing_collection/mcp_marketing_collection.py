@@ -18,12 +18,6 @@ from silvaengine_utility import Utility
 MCP_CONFIGURATION = {
     "tools": [
         {
-            "name": "get_google_place_setting",
-            "description": "Retrieves the Google Place API configuration including the search keyword and API key required for place-based marketing operations. Use this to obtain credentials needed for Google Places API integration.",
-            "inputSchema": {"type": "object", "properties": {}, "required": []},
-            "annotations": None,
-        },
-        {
             "name": "get_place",
             "description": "Retrieves an existing place by UUID or finds/creates a place based on location data (region, latitude, longitude, address). When providing location data along with business details (business_name, phone_number, website, types), it will create a new place if none exists at that location, or update the existing place if the details have changed. Returns the complete place object with place_uuid.",
             "inputSchema": {
@@ -56,18 +50,6 @@ MCP_CONFIGURATION = {
                     },
                 },
                 "required": [],
-            },
-            "annotations": None,
-        },
-        {
-            "name": "get_question_group",
-            "description": "Fetches the appropriate question group configuration for a specific place based on place_uuid. Returns place-specific questions if available, otherwise falls back to the default regional question group (region='*') with the lowest weight. The question group defines the data collection questions for that location.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "place_uuid": {"type": "string", "description": "UUID of the place"}
-                },
-                "required": ["place_uuid"],
             },
             "annotations": None,
         },
@@ -420,21 +402,6 @@ class MCPMarketingCollection:
             )
 
     # * MCP Function.
-    def get_google_place_setting(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Get Google Place API settings for marketing collection."""
-        try:
-            self.logger.info(f"Arguments: {arguments}")
-            self.logger.info(f"Setting: {self.setting}")
-            return {
-                "keyword": self.setting["keyword"],
-                "google_api_key": self.setting["google_api_key"],
-            }
-        except Exception as e:
-            log = traceback.format_exc()
-            self.logger.error(log)
-            raise e
-
-    # * MCP Function.
     def get_place(self, **arguments: Dict[str, any]) -> Dict[str, Any]:
         """ """
         try:
@@ -500,53 +467,6 @@ class MCPMarketingCollection:
 
             return place
 
-        except Exception as e:
-            log = traceback.format_exc()
-            self.logger.error(log)
-            raise e
-
-    # * MCP Function.
-    def get_question_group(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Get question group for a place."""
-        try:
-            self.logger.info(f"Arguments: {arguments}")
-            place_uuid = arguments["place_uuid"]
-            result = self._execute_graphql_query(
-                "ai_marketing_graphql",
-                "questionGroupList",
-                "Query",
-                {"placeUuid": place_uuid},
-            )
-            if result["questionGroupList"]["total"] == 0:
-                result = self._execute_graphql_query(
-                    "ai_marketing_graphql",
-                    "questionGroupList",
-                    "Query",
-                    {"region": "*"},
-                )
-
-            question_groups = result["questionGroupList"]["questionGroupList"]
-            question_groups = [
-                humps.decamelize(
-                    {
-                        k: v
-                        for k, v in question_group.items()
-                        if v is not None
-                        and k
-                        not in [
-                            "endpointId",
-                            "questionCriteria",
-                            "region",
-                            "updatedAt",
-                            "updatedBy",
-                            "createdAt",
-                        ]
-                    }
-                )
-                for question_group in question_groups
-            ]
-
-            return sorted(question_groups, key=lambda x: x["weight"])[0]
         except Exception as e:
             log = traceback.format_exc()
             self.logger.error(log)
