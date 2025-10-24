@@ -238,26 +238,10 @@ MCP_CONFIGURATION = {
     "module_links": [
         {
             "type": "tool",
-            "name": "get_google_place_setting",
-            "module_name": "mcp_marketing_collection",
-            "class_name": "MCPMarketingCollection",
-            "function_name": "get_google_place_setting",
-            "return_type": "text",
-        },
-        {
-            "type": "tool",
             "name": "get_place",
             "module_name": "mcp_marketing_collection",
             "class_name": "MCPMarketingCollection",
             "function_name": "get_place",
-            "return_type": "text",
-        },
-        {
-            "type": "tool",
-            "name": "get_question_group",
-            "module_name": "mcp_marketing_collection",
-            "class_name": "MCPMarketingCollection",
-            "function_name": "get_question_group",
             "return_type": "text",
         },
         {
