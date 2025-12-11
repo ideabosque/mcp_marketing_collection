@@ -18,17 +18,15 @@ from silvaengine_utility import Utility
 MCP_CONFIGURATION = {
     "tools": [
         {
-            "name": "get_google_place_setting",
-            "description": "Get Google Place API settings for marketing collection",
-            "inputSchema": {"type": "object", "properties": {}, "required": []},
-            "annotations": None,
-        },
-        {
             "name": "get_place",
-            "description": "Get or create a place by location and business details",
+            "description": "Retrieves an existing place by UUID or finds/creates a place based on location data (region, latitude, longitude, address). When providing location data along with business details (business_name, phone_number, website, types), it will create a new place if none exists at that location, or update the existing place if the details have changed. Returns the complete place object with place_uuid.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
+                    "place_uuid": {
+                        "type": "string",
+                        "description": "UUID of the place to fetch (alternative to location-based lookup)",
+                    },
                     "region": {"type": "string", "description": "Region identifier"},
                     "latitude": {
                         "type": "number",
@@ -51,25 +49,13 @@ MCP_CONFIGURATION = {
                         "description": "Array of business types",
                     },
                 },
-                "required": ["region", "latitude", "longitude", "address"],
-            },
-            "annotations": None,
-        },
-        {
-            "name": "get_question_group",
-            "description": "Get question group for a place",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "place_uuid": {"type": "string", "description": "UUID of the place"}
-                },
-                "required": ["place_uuid"],
+                "required": [],
             },
             "annotations": None,
         },
         {
             "name": "get_contact_profile",
-            "description": "Get or create contact profile",
+            "description": "Retrieves an existing contact profile by email or creates a new one with contact information (email, first_name, last_name). Optionally associates the contact with a place using place_uuid. If the contact exists but details (name or place association) have changed, it updates the profile. Returns the complete contact profile including contact_uuid and associated place information.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -96,7 +82,7 @@ MCP_CONFIGURATION = {
         },
         {
             "name": "data_collect",
-            "description": "Collect data and create/update contact profile",
+            "description": "Processes and stores collected marketing data for a contact. Accepts a JSON dataset containing place_uuid, contact information (email, first_name, last_name), and additional custom data fields (all fields will be stored). Creates or updates the contact profile with the provided data, automatically assigns the configured sales representative, and returns the contact_uuid along with sales rep contact information for follow-up.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -111,7 +97,7 @@ MCP_CONFIGURATION = {
         },
         {
             "name": "submit_request",
-            "description": "Submit a contact request",
+            "description": "Creates a new contact request record in the system with a title and detailed description. Links the request to both a place (via place_uuid) and a contact (via contact_uuid), enabling tracking of customer inquiries, support requests, or sales opportunities. Returns the generated request_uuid for reference and follow-up tracking.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -142,14 +128,8 @@ MCP_CONFIGURATION = {
             "annotations": None,
         },
         {
-            "name": "get_shopify_product_data",
-            "description": "Get Shopify product data for promotion",
-            "inputSchema": {"type": "object", "properties": {}, "required": []},
-            "annotations": None,
-        },
-        {
             "name": "place_shopify_draft_order",
-            "description": "Place a Shopify draft order",
+            "description": "Creates a draft order in Shopify for a customer identified by email. Accepts an array of line items (each with variant_id and quantity), along with optional shipping_address and billing_address objects. The draft order can be reviewed and modified before being finalized in Shopify. Returns the complete draft order object from Shopify, or None if creation fails.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -211,32 +191,57 @@ MCP_CONFIGURATION = {
             },
             "annotations": None,
         },
+        {
+            "name": "get_shopify_customer",
+            "description": "Retrieves or creates a Shopify customer record based on email and address information. First creates or updates the contact profile in the marketing system (associating it with the place_uuid from the address), then fetches the corresponding customer data from Shopify including their address details, purchase history, and account information. Returns the customer object from Shopify, or None if not found.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "description": "Contact information",
+                        "properties": {
+                            "email": {"type": "string"},
+                            "first_name": {"type": "string"},
+                            "last_name": {"type": "string"},
+                            "phone": {"type": "string"},
+                        },
+                        "required": ["email"],
+                    },
+                    "address": {
+                        "type": "object",
+                        "description": "Customer address information",
+                        "properties": {
+                            "place_uuid": {"type": "string"},
+                            "address1": {"type": "string"},
+                            "address2": {"type": "string"},
+                            "city": {"type": "string"},
+                            "province_code": {"type": "string"},
+                            "province": {"type": "string"},
+                            "zip": {"type": "string"},
+                            "country": {"type": "string"},
+                            "country_code": {"type": "string"},
+                            "company": {"type": "string"},
+                            "first_name": {"type": "string"},
+                            "last_name": {"type": "string"},
+                            "phone": {"type": "string"},
+                        },
+                    },
+                },
+                "required": ["contact"],
+            },
+            "annotations": None,
+        },
     ],
     "resources": [],
     "prompts": [],
     "module_links": [
         {
             "type": "tool",
-            "name": "get_google_place_setting",
-            "module_name": "mcp_marketing_collection",
-            "class_name": "MCPMarketingCollection",
-            "function_name": "get_google_place_setting",
-            "return_type": "text",
-        },
-        {
-            "type": "tool",
             "name": "get_place",
             "module_name": "mcp_marketing_collection",
             "class_name": "MCPMarketingCollection",
             "function_name": "get_place",
-            "return_type": "text",
-        },
-        {
-            "type": "tool",
-            "name": "get_question_group",
-            "module_name": "mcp_marketing_collection",
-            "class_name": "MCPMarketingCollection",
-            "function_name": "get_question_group",
             "return_type": "text",
         },
         {
@@ -265,18 +270,18 @@ MCP_CONFIGURATION = {
         },
         {
             "type": "tool",
-            "name": "get_shopify_product_data",
-            "module_name": "mcp_marketing_collection",
-            "class_name": "MCPMarketingCollection",
-            "function_name": "get_shopify_product_data",
-            "return_type": "text",
-        },
-        {
-            "type": "tool",
             "name": "place_shopify_draft_order",
             "module_name": "mcp_marketing_collection",
             "class_name": "MCPMarketingCollection",
             "function_name": "place_shopify_draft_order",
+            "return_type": "text",
+        },
+        {
+            "type": "tool",
+            "name": "get_shopify_customer",
+            "module_name": "mcp_marketing_collection",
+            "class_name": "MCPMarketingCollection",
+            "function_name": "get_shopify_customer",
             "return_type": "text",
         },
     ],
@@ -381,25 +386,25 @@ class MCPMarketingCollection:
             )
 
     # * MCP Function.
-    def get_google_place_setting(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Get Google Place API settings for marketing collection."""
-        try:
-            self.logger.info(f"Arguments: {arguments}")
-            self.logger.info(f"Setting: {self.setting}")
-            return {
-                "keyword": self.setting["keyword"],
-                "google_api_key": self.setting["google_api_key"],
-            }
-        except Exception as e:
-            log = traceback.format_exc()
-            self.logger.error(log)
-            raise e
-
-    # * MCP Function.
     def get_place(self, **arguments: Dict[str, any]) -> Dict[str, Any]:
         """ """
         try:
             self.logger.info(f"Arguments: {arguments}")
+
+            if arguments.get("place_uuid"):
+                result = self._execute_graphql_query(
+                    "ai_marketing_graphql",
+                    "place",
+                    "Query",
+                    {"placeUuid": arguments["place_uuid"]},
+                )
+                place = humps.decamelize(result["place"])
+                return place
+
+            assert all(
+                arguments.get(k) for k in ["region", "latitude", "longitude", "address"]
+            ), "Missing required arguments"
+
             variables = {
                 "region": arguments["region"],
                 "latitude": arguments["latitude"],
@@ -446,53 +451,6 @@ class MCPMarketingCollection:
 
             return place
 
-        except Exception as e:
-            log = traceback.format_exc()
-            self.logger.error(log)
-            raise e
-
-    # * MCP Function.
-    def get_question_group(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Get question group for a place."""
-        try:
-            self.logger.info(f"Arguments: {arguments}")
-            place_uuid = arguments["place_uuid"]
-            result = self._execute_graphql_query(
-                "ai_marketing_graphql",
-                "questionGroupList",
-                "Query",
-                {"placeUuid": place_uuid},
-            )
-            if result["questionGroupList"]["total"] == 0:
-                result = self._execute_graphql_query(
-                    "ai_marketing_graphql",
-                    "questionGroupList",
-                    "Query",
-                    {"region": "*"},
-                )
-
-            question_groups = result["questionGroupList"]["questionGroupList"]
-            question_groups = [
-                humps.decamelize(
-                    {
-                        k: v
-                        for k, v in question_group.items()
-                        if v is not None
-                        and k
-                        not in [
-                            "endpointId",
-                            "questionCriteria",
-                            "region",
-                            "updatedAt",
-                            "updatedBy",
-                            "createdAt",
-                        ]
-                    }
-                )
-                for question_group in question_groups
-            ]
-
-            return sorted(question_groups, key=lambda x: x["weight"])[0]
         except Exception as e:
             log = traceback.format_exc()
             self.logger.error(log)
@@ -690,6 +648,65 @@ class MCPMarketingCollection:
             )
             if result.get("createDraftOrder", {}).get("draftOrder"):
                 return result.get("createDraftOrder", {}).get("draftOrder")
+            return None
+        except Exception as e:
+            log = traceback.format_exc()
+            self.logger.error(log)
+            raise e
+
+    # * MCP Function.
+    def get_shopify_customer(self, **arguments: Dict[str, Any]) -> str:
+        """get a Shopify customer."""
+        try:
+            contact = arguments["contact"]
+            email = contact["email"]
+            first_name = contact.get("first_name")
+            last_name = contact.get("last_name")
+            phone = contact.get("phone")
+            address = arguments.get("address", {})
+
+            contact_profile = self.get_contact_profile(
+                **{
+                    "contact": contact,
+                    "place": {"place_uuid": address.get("place_uuid")},
+                }
+            )
+            self.logger.info(f"Contact Profile: {contact_profile}")
+
+            variables = {
+                "shop": self.endpoint_id,
+                "email": email,
+                "firstName": first_name,
+                "LastName": last_name,
+                "phone": phone,
+            }
+            if address:
+                variables.update(
+                    {
+                        "address": {
+                            "address1": address.get("address1"),
+                            "address2": address.get("address2"),
+                            "city": address.get("city"),
+                            "province_code": address.get("province_code"),
+                            "province": address.get("province"),
+                            "zip": address.get("zip"),
+                            "country": address.get("country"),
+                            "country_code": address.get("country_code"),
+                            "company": address.get("company"),
+                            "first_name": address.get("first_name"),
+                            "last_name": address.get("last_name"),
+                            "phone": address.get("phone"),
+                        }
+                    }
+                )
+            result = self._execute_graphql_query(
+                "shopify_app_engine_graphql",
+                "customer",
+                "Query",
+                variables,
+            )
+            if result.get("customer"):
+                return result.get("customer")
             return None
         except Exception as e:
             log = traceback.format_exc()
