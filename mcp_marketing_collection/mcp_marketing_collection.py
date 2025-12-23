@@ -7,13 +7,13 @@ __author__ = "bibow"
 import logging
 import re
 import traceback
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import boto3
 import humps
-import pendulum
 
-from silvaengine_utility import Utility
+from silvaengine_utility.graphql import Graphql
+from silvaengine_utility.serializer import Serializer
 
 MCP_CONFIGURATION = {
     "tools": [
@@ -308,16 +308,25 @@ class MCPMarketingCollection:
         self.logger = logger
         self.setting = setting
         self._endpoint_id = None
+        self._part_id = None
         self._schemas = {}
         self._aws_lambda = self._initialize_aws_lambda_client(**setting)
 
     @property
-    def endpoint_id(self) -> str:
+    def endpoint_id(self) -> str | None:
         return self._endpoint_id
 
     @endpoint_id.setter
     def endpoint_id(self, value: str):
         self._endpoint_id = value
+
+    @property
+    def part_id(self) -> str | None:
+        return self._part_id
+    
+    @part_id.setter
+    def part_id(self, value: str):
+        self._part_id = value
 
     def _initialize_aws_lambda_client(self, **setting: Dict[str, Any]) -> boto3.client:
         region_name = setting.get("region_name")
@@ -339,12 +348,14 @@ class MCPMarketingCollection:
     ) -> Dict[str, Any]:
         try:
             if self._schemas.get(function_name) is None:
-                self._schemas[function_name] = Utility.fetch_graphql_schema(
-                    self.logger,
-                    self.endpoint_id,
+                context = {
+                    "endpoint_id": self.endpoint_id,
+                    "setting": self.setting,
+                    "logger": self.logger,
+                }
+                self._schemas[function_name] = Graphql.fetch_graphql_schema(
+                    context,
                     function_name,
-                    setting=self.setting,
-                    execute_mode=self.setting.get("execute_mode"),
                     aws_lambda=self._aws_lambda,
                 )
             return self._schemas[function_name]
@@ -361,21 +372,26 @@ class MCPMarketingCollection:
         operation_name: str,
         operation_type: str,
         variables: Dict[str, Any],
+        query: str = None,
     ) -> Dict[str, Any]:
         try:
-            schema = self._fetch_graphql_schema(function_name)
-            query = Utility.generate_graphql_operation(
-                operation_name, operation_type, schema
-            )
+            if query is None:
+                schema = self._fetch_graphql_schema(function_name)
+                query = Graphql.generate_graphql_operation(
+                    operation_name, operation_type, schema
+                )
             self.logger.info(f"Query: {query}/{function_name}")
-            return Utility.execute_graphql_query(
-                self.logger,
-                self.endpoint_id,
+            context = {
+                "endpoint_id": self.endpoint_id,
+                "part_id": self.part_id,
+                "setting": self.setting,
+                "logger": self.logger,
+            }
+            return Graphql.execute_graphql_query(
+                context,
                 function_name,
                 query,
                 variables,
-                setting=self.setting,
-                execute_mode=self.setting.get("execute_mode"),
                 aws_lambda=self._aws_lambda,
             )
         except Exception as e:
@@ -519,7 +535,7 @@ class MCPMarketingCollection:
             self.logger.info(f"Arguments: {arguments}")
             data_collect_dataset = {
                 k: (", ".join(v) if isinstance(v, list) else v)
-                for k, v in Utility.json_loads(
+                for k, v in Serializer.json_loads(
                     arguments["data_collect_dataset"]
                 ).items()
                 if v is not None
@@ -634,7 +650,7 @@ class MCPMarketingCollection:
                     }
                 )
             variables = {
-                "shop": self.endpoint_id,
+                "shop": self.part_id,
                 "email": email,
                 "lineItems": line_items,
                 "shippingAddress": shipping_address,
@@ -646,7 +662,7 @@ class MCPMarketingCollection:
                 "Mutation",
                 variables,
             )
-            if result.get("createDraftOrder", {}).get("draftOrder"):
+            if result and result.get("createDraftOrder", {}).get("draftOrder"):
                 return result.get("createDraftOrder", {}).get("draftOrder")
             return None
         except Exception as e:
@@ -674,7 +690,7 @@ class MCPMarketingCollection:
             self.logger.info(f"Contact Profile: {contact_profile}")
 
             variables = {
-                "shop": self.endpoint_id,
+                "shop": self.part_id,
                 "email": email,
                 "firstName": first_name,
                 "LastName": last_name,
