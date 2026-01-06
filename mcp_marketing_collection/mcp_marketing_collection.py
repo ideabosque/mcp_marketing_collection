@@ -323,7 +323,7 @@ class MCPMarketingCollection:
     @property
     def part_id(self) -> str | None:
         return self._part_id
-    
+
     @part_id.setter
     def part_id(self, value: str):
         self._part_id = value
