@@ -323,7 +323,7 @@ class MCPMarketingCollection:
     @property
     def part_id(self) -> str | None:
         return self._part_id
-    
+
     @part_id.setter
     def part_id(self, value: str):
         self._part_id = value
@@ -650,7 +650,7 @@ class MCPMarketingCollection:
                     }
                 )
             variables = {
-                "shop": self.part_id,
+                "shop": self.endpoint_id,
                 "email": email,
                 "lineItems": line_items,
                 "shippingAddress": shipping_address,
@@ -662,7 +662,7 @@ class MCPMarketingCollection:
                 "Mutation",
                 variables,
             )
-            if result and result.get("createDraftOrder", {}).get("draftOrder"):
+            if result.get("createDraftOrder", {}).get("draftOrder"):
                 return result.get("createDraftOrder", {}).get("draftOrder")
             return None
         except Exception as e:
@@ -690,7 +690,7 @@ class MCPMarketingCollection:
             self.logger.info(f"Contact Profile: {contact_profile}")
 
             variables = {
-                "shop": self.part_id,
+                "shop": self.endpoint_id,
                 "email": email,
                 "firstName": first_name,
                 "LastName": last_name,
