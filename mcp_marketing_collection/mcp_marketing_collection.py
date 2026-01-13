@@ -342,34 +342,6 @@ class MCPMarketingCollection:
         else:
             return boto3.client("lambda")
 
-<<<<<<< HEAD
-    def _fetch_graphql_schema(
-        self,
-        function_name: str,
-    ) -> Dict[str, Any]:
-        try:
-            if self._schemas.get(function_name) is None:
-                context = {
-                    "endpoint_id": self.endpoint_id,
-                    "part_id": self.part_id,
-                    "setting": self.setting,
-                    "logger": self.logger,
-                }
-                self._schemas[function_name] = Graphql.fetch_graphql_schema(
-                    context,
-                    function_name,
-                    aws_lambda=self._aws_lambda,
-                )
-            return self._schemas[function_name]
-        except Exception as e:
-            log = traceback.format_exc()
-            self.logger.error(log)
-            raise Exception(
-                f"Failed to fetch GraphQL schema: {function_name}/{self.endpoint_id}. Please check the configuration and ensure all required settings are properly. Error: {e}"
-            )
-
-=======
->>>>>>> cec83e301df6526ad14406e4a18a8d17de83e34f
     def _execute_graphql_query(
         self,
         function_name: str,
@@ -492,23 +464,10 @@ class MCPMarketingCollection:
                 "Query",
                 variables,
             )
-<<<<<<< HEAD
-            if result["contactProfileList"]["total"] > 0:
-                contact_profile = humps.decamelize(
-                    result["contactProfileList"]["contactProfileList"][0]
-                )
-                # Only add contactUuid if it's not None or empty
-                contact_uuid = contact_profile.get("contact_uuid")
-                self.logger.info(f"Found contact_uuid: {contact_uuid!r}")
-                # Only add if it's a valid non-empty string
-                if contact_uuid and str(contact_uuid).strip():
-                    variables.update({"contactUuid": contact_uuid})
-=======
 
             if result["total"] > 0:
                 contact_profile = humps.decamelize(result["contactProfileList"][0])
                 variables.update({"contactUuid": contact_profile["contact_uuid"]})
->>>>>>> cec83e301df6526ad14406e4a18a8d17de83e34f
 
                 if all(
                     [
