@@ -471,8 +471,8 @@ class MCPMarketingCollection:
 
                 if all(
                     [
-                        contact_profile.get("first_name") == contact["first_name"],
-                        contact_profile.get("last_name") == contact["last_name"],
+                        contact_profile.get("first_name") == contact.get("first_name"),
+                        contact_profile.get("last_name") == contact.get("last_name"),
                         contact_profile["place"].get("place_uuid")
                         == place.get("place_uuid"),
                     ]
@@ -481,8 +481,8 @@ class MCPMarketingCollection:
 
             variables.update(
                 {
-                    "firstName": contact["first_name"],
-                    "lastName": contact["last_name"],
+                    "firstName": contact.get("first_name"),
+                    "lastName": contact.get("last_name"),
                     "placeUuid": place.get("place_uuid"),
                     "updatedBy": "Admin",
                 }
