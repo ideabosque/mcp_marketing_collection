@@ -11,7 +11,6 @@ from typing import Any, Dict
 
 import boto3
 import humps
-
 from silvaengine_utility.graphql import Graphql
 from silvaengine_utility.serializer import Serializer
 
@@ -563,7 +562,9 @@ class MCPMarketingCollection:
             email = data_collect_dataset.pop("email", None)
             first_name = data_collect_dataset.pop("first_name", None)
             last_name = data_collect_dataset.pop("last_name", None)
-            data_collect_dataset.update({"sales_rep": self.setting["sales_rep"]})
+            data_collect_dataset.update(
+                {"sales_rep": self.setting.get("sales_rep", "Marketing Team")}
+            )
 
             result = self._execute_graphql_query(
                 "ai_marketing_graphql",
@@ -605,8 +606,10 @@ class MCPMarketingCollection:
 
             return {
                 "contact_uuid": contact_profile["contact_uuid"],
-                "sales_rep": self.setting["sales_rep"],
-                "sales_rep_email": self.setting["sales_rep_email"],
+                "sales_rep": self.setting.get("sales_rep", "Marketing Team"),
+                "sales_rep_email": self.setting.get(
+                    "sales_rep_email", "marketing@company.com"
+                ),
             }
         except Exception as e:
             log = traceback.format_exc()
