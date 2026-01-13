@@ -11,6 +11,7 @@ from typing import Any, Dict
 
 import boto3
 import humps
+
 from silvaengine_utility.graphql import Graphql
 from silvaengine_utility.serializer import Serializer
 
@@ -341,58 +342,31 @@ class MCPMarketingCollection:
         else:
             return boto3.client("lambda")
 
-    def _fetch_graphql_schema(
-        self,
-        function_name: str,
-    ) -> Dict[str, Any]:
-        try:
-            if self._schemas.get(function_name) is None:
-                context = {
-                    "endpoint_id": self.endpoint_id,
-                    "setting": self.setting,
-                    "logger": self.logger,
-                }
-                self._schemas[function_name] = Graphql.fetch_graphql_schema(
-                    context,
-                    function_name,
-                    aws_lambda=self._aws_lambda,
-                )
-            return self._schemas[function_name]
-        except Exception as e:
-            log = traceback.format_exc()
-            self.logger.error(log)
-            raise Exception(
-                f"Failed to fetch GraphQL schema: {function_name}/{self.endpoint_id}. Please check the configuration and ensure all required settings are properly. Error: {e}"
-            )
-
     def _execute_graphql_query(
         self,
         function_name: str,
         operation_name: str,
         operation_type: str,
         variables: Dict[str, Any],
-        query: str = None,
     ) -> Dict[str, Any]:
         try:
-            if query is None:
-                schema = self._fetch_graphql_schema(function_name)
-                query = Graphql.generate_graphql_operation(
-                    operation_name, operation_type, schema
-                )
-            self.logger.info(f"Query: {query}/{function_name}")
             context = {
                 "endpoint_id": self.endpoint_id,
                 "part_id": self.part_id,
                 "setting": self.setting,
                 "logger": self.logger,
             }
-            return Graphql.execute_graphql_query(
-                context,
-                function_name,
-                query,
-                variables,
-                aws_lambda=self._aws_lambda,
+
+            result = Graphql.request_graphql(
+                context=context,
+                module_name="ai_marketing_engine",
+                function_name="ai_marketing_graphql",
+                graphql_operation_type=operation_type,
+                graphql_operation_name=operation_name,
+                class_name="AIMarketingEngine",
+                variables=variables,
             )
+            return result
         except Exception as e:
             log = traceback.format_exc()
             self.logger.error(log)
@@ -407,23 +381,11 @@ class MCPMarketingCollection:
             self.logger.info(f"Arguments: {arguments}")
 
             if arguments.get("place_uuid"):
-                # result = self._execute_graphql_query(
-                #     "ai_marketing_graphql",
-                #     "place",
-                #     "Query",
-                #     {"placeUuid": arguments["place_uuid"]},
-                # )
-                result = Graphql.request_graphql(
-                    context={
-                        "logger": self.logger,
-                        "setting": self.setting,
-                    },
-                    module_name="ai_marketing_engine",
-                    function_name="ai_marketing_graphql",
-                    graphql_operation_type="Query",
-                    graphql_operation_name="place",
-                    class_name="AIMarketingEngine",
-                    variables={"placeUuid": arguments["place_uuid"]},
+                result = self._execute_graphql_query(
+                    "ai_marketing_graphql",
+                    "place",
+                    "Query",
+                    {"placeUuid": arguments["place_uuid"]},
                 )
 
                 if result and "place" in result:
@@ -440,27 +402,15 @@ class MCPMarketingCollection:
                 "longitude": arguments["longitude"],
                 "address": arguments["address"],
             }
-            # result = self._execute_graphql_query(
-            #     "ai_marketing_graphql",
-            #     "placeList",
-            #     "Query",
-            #     variables,
-            # )
-            result = Graphql.request_graphql(
-                context={
-                    "logger": self.logger,
-                    "setting": self.setting,
-                },
-                module_name="ai_marketing_engine",
-                function_name="ai_marketing_graphql",
-                graphql_operation_type="Query",
-                graphql_operation_name="placeList",
-                class_name="AIMarketingEngine",
-                variables=variables,
+            result = self._execute_graphql_query(
+                "ai_marketing_graphql",
+                "placeList",
+                "Query",
+                variables,
             )
 
-            if result["placeList"]["total"] > 0:
-                place = humps.decamelize(result["placeList"]["placeList"][0])
+            if result["total"] > 0:
+                place = humps.decamelize(result["placeList"][0])
                 variables.update({"placeUuid": place["place_uuid"]})
 
                 if all(
@@ -483,25 +433,13 @@ class MCPMarketingCollection:
                     "updatedBy": "Admin",
                 }
             )
-            # result = self._execute_graphql_query(
-            #     "ai_marketing_graphql",
-            #     "insertUpdatePlace",
-            #     "Mutation",
-            #     variables,
-            # )
-            result = Graphql.request_graphql(
-                context={
-                    "logger": self.logger,
-                    "setting": self.setting,
-                },
-                module_name="ai_marketing_engine",
-                function_name="ai_marketing_graphql",
-                graphql_operation_type="Mutation",
-                graphql_operation_name="insertUpdatePlace",
-                class_name="AIMarketingEngine",
-                variables=variables,
+            result = self._execute_graphql_query(
+                "ai_marketing_graphql",
+                "insertUpdatePlace",
+                "Mutation",
+                variables,
             )
-            place = humps.decamelize(result["insertUpdatePlace"]["place"])
+            place = humps.decamelize(result["place"])
 
             return place
 
@@ -520,29 +458,15 @@ class MCPMarketingCollection:
             variables = {
                 "email": contact["email"],
             }
-            # result = self._execute_graphql_query(
-            #     "ai_marketing_graphql",
-            #     "contactProfileList",
-            #     "Query",
-            #     variables,
-            # )
-            result = Graphql.request_graphql(
-                context={
-                    "logger": self.logger,
-                    "setting": self.setting,
-                },
-                module_name="ai_marketing_engine",
-                function_name="ai_marketing_graphql",
-                graphql_operation_type="Query",
-                graphql_operation_name="contactProfileList",
-                class_name="AIMarketingEngine",
-                variables=variables,
+            result = self._execute_graphql_query(
+                "ai_marketing_graphql",
+                "contactProfileList",
+                "Query",
+                variables,
             )
 
-            if result["contactProfileList"]["total"] > 0:
-                contact_profile = humps.decamelize(
-                    result["contactProfileList"]["contactProfileList"][0]
-                )
+            if result["total"] > 0:
+                contact_profile = humps.decamelize(result["contactProfileList"][0])
                 variables.update({"contactUuid": contact_profile["contact_uuid"]})
 
                 if all(
@@ -563,27 +487,13 @@ class MCPMarketingCollection:
                     "updatedBy": "Admin",
                 }
             )
-            # result = self._execute_graphql_query(
-            #     "ai_marketing_graphql",
-            #     "insertUpdateContactProfile",
-            #     "Mutation",
-            #     variables,
-            # )
-            result = Graphql.request_graphql(
-                context={
-                    "logger": self.logger,
-                    "setting": self.setting,
-                },
-                module_name="ai_marketing_engine",
-                function_name="ai_marketing_graphql",
-                graphql_operation_type="Mutation",
-                graphql_operation_name="insertUpdateContactProfile",
-                class_name="AIMarketingEngine",
-                variables=variables,
+            result = self._execute_graphql_query(
+                "ai_marketing_graphql",
+                "insertUpdateContactProfile",
+                "Mutation",
+                variables,
             )
-            contact_profile = humps.decamelize(
-                result["insertUpdateContactProfile"]["contactProfile"]
-            )
+            contact_profile = humps.decamelize(result["contactProfile"])
 
             return contact_profile
         except Exception as e:
@@ -616,32 +526,18 @@ class MCPMarketingCollection:
                 "email": email,
             }
 
-            # result = self._execute_graphql_query(
-            #     "ai_marketing_graphql",
-            #     "contactProfileList",
-            #     "Query",
-            #     {
-            #         "email": email,
-            #     },
-            # )
-            result = Graphql.request_graphql(
-                context={
-                    "logger": self.logger,
-                    "setting": self.setting,
+            result = self._execute_graphql_query(
+                "ai_marketing_graphql",
+                "contactProfileList",
+                "Query",
+                {
+                    "email": email,
                 },
-                module_name="ai_marketing_engine",
-                function_name="ai_marketing_graphql",
-                graphql_operation_type="Query",
-                graphql_operation_name="contactProfileList",
-                class_name="AIMarketingEngine",
-                variables=variables,
             )
             contact_uuid = None
 
-            if result["contactProfileList"]["total"] > 0:
-                contact_profile = humps.decamelize(
-                    result["contactProfileList"]["contactProfileList"][0]
-                )
+            if result["total"] > 0:
+                contact_profile = humps.decamelize(result["contactProfileList"][0])
                 contact_uuid = contact_profile["contact_uuid"]
 
             variables = {
@@ -655,27 +551,13 @@ class MCPMarketingCollection:
             if contact_uuid:
                 variables.update({"contactUuid": contact_uuid})
 
-            # result = self._execute_graphql_query(
-            #     "ai_marketing_graphql",
-            #     "insertUpdateContactProfile",
-            #     "Mutation",
-            #     variables,
-            # )
-            result = Graphql.request_graphql(
-                context={
-                    "logger": self.logger,
-                    "setting": self.setting,
-                },
-                module_name="ai_marketing_engine",
-                function_name="ai_marketing_graphql",
-                graphql_operation_type="Mutation",
-                graphql_operation_name="insertUpdateContactProfile",
-                class_name="AIMarketingEngine",
-                variables=variables,
+            result = self._execute_graphql_query(
+                "ai_marketing_graphql",
+                "insertUpdateContactProfile",
+                "Mutation",
+                variables,
             )
-            contact_profile = humps.decamelize(
-                result["insertUpdateContactProfile"]["contactProfile"]
-            )
+            contact_profile = humps.decamelize(result["contactProfile"])
             self.logger.info(f"Contact Profile: {contact_profile}")
 
             return {
@@ -703,27 +585,13 @@ class MCPMarketingCollection:
                 "requestDetail": arguments["request_detail"],
                 "updatedBy": "Admin",
             }
-            # result = self._execute_graphql_query(
-            #     "ai_marketing_graphql",
-            #     "insertUpdateContactRequest",
-            #     "Mutation",
-            #     variables,
-            # )
-            result = Graphql.request_graphql(
-                context={
-                    "logger": self.logger,
-                    "setting": self.setting,
-                },
-                module_name="ai_marketing_engine",
-                function_name="ai_marketing_graphql",
-                graphql_operation_type="Mutation",
-                graphql_operation_name="insertUpdateContactRequest",
-                class_name="AIMarketingEngine",
-                variables=variables,
+            result = self._execute_graphql_query(
+                "ai_marketing_graphql",
+                "insertUpdateContactRequest",
+                "Mutation",
+                variables,
             )
-            contact_request = humps.decamelize(
-                result["insertUpdateContactRequest"]["contactRequest"]
-            )
+            contact_request = humps.decamelize(result["contactRequest"])
 
             return {"request_uuid": contact_request["request_uuid"]}
         except Exception as e:
@@ -764,27 +632,15 @@ class MCPMarketingCollection:
                 "shippingAddress": shipping_address,
                 "billingAddress": billing_address,
             }
-            # result = self._execute_graphql_query(
-            #     "shopify_app_engine_graphql",
-            #     "createDraftOrder",
-            #     "Mutation",
-            #     variables,
-            # )
-            result = Graphql.request_graphql(
-                context={
-                    "logger": self.logger,
-                    "setting": self.setting,
-                },
-                module_name="shopify_app_engine",
-                function_name="shopify_app_engine_graphql",
-                graphql_operation_type="Mutation",
-                graphql_operation_name="createDraftOrder",
-                class_name="ShopifyAppEngine",
-                variables=variables,
+            result = self._execute_graphql_query(
+                "shopify_app_engine_graphql",
+                "createDraftOrder",
+                "Mutation",
+                variables,
             )
 
-            if result.get("createDraftOrder", {}).get("draftOrder"):
-                return result.get("createDraftOrder", {}).get("draftOrder")
+            if result.get("draftOrder"):
+                return humps.decamelize(result["draftOrder"])
             return None
         except Exception as e:
             log = traceback.format_exc()
@@ -836,26 +692,14 @@ class MCPMarketingCollection:
                         }
                     }
                 )
-            # result = self._execute_graphql_query(
-            #     "shopify_app_engine_graphql",
-            #     "customer",
-            #     "Query",
-            #     variables,
-            # )
-            result = Graphql.request_graphql(
-                context={
-                    "logger": self.logger,
-                    "setting": self.setting,
-                },
-                module_name="shopify_app_engine",
-                function_name="shopify_app_engine_graphql",
-                graphql_operation_type="Query",
-                graphql_operation_name="customer",
-                class_name="ShopifyAppEngine",
-                variables=variables,
+            result = self._execute_graphql_query(
+                "shopify_app_engine_graphql",
+                "customer",
+                "Query",
+                variables,
             )
             if result.get("customer"):
-                return result.get("customer")
+                return humps.decamelize(result["customer"])
             return None
         except Exception as e:
             log = traceback.format_exc()
