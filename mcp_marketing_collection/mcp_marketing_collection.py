@@ -11,6 +11,7 @@ from typing import Any, Dict
 
 import boto3
 import humps
+
 from silvaengine_utility.graphql import Graphql
 from silvaengine_utility.serializer import Serializer
 
@@ -341,6 +342,7 @@ class MCPMarketingCollection:
         else:
             return boto3.client("lambda")
 
+<<<<<<< HEAD
     def _fetch_graphql_schema(
         self,
         function_name: str,
@@ -366,34 +368,33 @@ class MCPMarketingCollection:
                 f"Failed to fetch GraphQL schema: {function_name}/{self.endpoint_id}. Please check the configuration and ensure all required settings are properly. Error: {e}"
             )
 
+=======
+>>>>>>> cec83e301df6526ad14406e4a18a8d17de83e34f
     def _execute_graphql_query(
         self,
         function_name: str,
         operation_name: str,
         operation_type: str,
         variables: Dict[str, Any],
-        query: str = None,
     ) -> Dict[str, Any]:
         try:
-            if query is None:
-                schema = self._fetch_graphql_schema(function_name)
-                query = Graphql.generate_graphql_operation(
-                    operation_name, operation_type, schema
-                )
-            self.logger.info(f"Query: {query}/{function_name}")
             context = {
                 "endpoint_id": self.endpoint_id,
                 "part_id": self.part_id,
                 "setting": self.setting,
                 "logger": self.logger,
             }
-            return Graphql.execute_graphql_query(
-                context,
-                function_name,
-                query,
-                variables,
-                aws_lambda=self._aws_lambda,
+
+            result = Graphql.request_graphql(
+                context=context,
+                module_name="ai_marketing_engine",
+                function_name="ai_marketing_graphql",
+                graphql_operation_type=operation_type,
+                graphql_operation_name=operation_name,
+                class_name="AIMarketingEngine",
+                variables=variables,
             )
+            return result
         except Exception as e:
             log = traceback.format_exc()
             self.logger.error(log)
@@ -402,7 +403,7 @@ class MCPMarketingCollection:
             )
 
     # * MCP Function.
-    def get_place(self, **arguments: Dict[str, any]) -> Dict[str, Any]:
+    def get_place(self, **arguments: Dict[str, Any]) -> Dict[str, Any]:
         """ """
         try:
             self.logger.info(f"Arguments: {arguments}")
@@ -414,8 +415,10 @@ class MCPMarketingCollection:
                     "Query",
                     {"placeUuid": arguments["place_uuid"]},
                 )
-                place = humps.decamelize(result["place"])
-                return place
+
+                if result and "place" in result:
+                    return humps.decamelize(result.get("place", {}))
+                return {}
 
             assert all(
                 arguments.get(k) for k in ["region", "latitude", "longitude", "address"]
@@ -433,8 +436,9 @@ class MCPMarketingCollection:
                 "Query",
                 variables,
             )
-            if result["placeList"]["total"] > 0:
-                place = humps.decamelize(result["placeList"]["placeList"][0])
+
+            if result["total"] > 0:
+                place = humps.decamelize(result["placeList"][0])
                 variables.update({"placeUuid": place["place_uuid"]})
 
                 if all(
@@ -463,7 +467,7 @@ class MCPMarketingCollection:
                 "Mutation",
                 variables,
             )
-            place = humps.decamelize(result["insertUpdatePlace"]["place"])
+            place = humps.decamelize(result["place"])
 
             return place
 
@@ -488,6 +492,7 @@ class MCPMarketingCollection:
                 "Query",
                 variables,
             )
+<<<<<<< HEAD
             if result["contactProfileList"]["total"] > 0:
                 contact_profile = humps.decamelize(
                     result["contactProfileList"]["contactProfileList"][0]
@@ -498,6 +503,12 @@ class MCPMarketingCollection:
                 # Only add if it's a valid non-empty string
                 if contact_uuid and str(contact_uuid).strip():
                     variables.update({"contactUuid": contact_uuid})
+=======
+
+            if result["total"] > 0:
+                contact_profile = humps.decamelize(result["contactProfileList"][0])
+                variables.update({"contactUuid": contact_profile["contact_uuid"]})
+>>>>>>> cec83e301df6526ad14406e4a18a8d17de83e34f
 
                 if all(
                     [
@@ -536,9 +547,7 @@ class MCPMarketingCollection:
                 "Mutation",
                 mutation_variables,
             )
-            contact_profile = humps.decamelize(
-                result["insertUpdateContactProfile"]["contactProfile"]
-            )
+            contact_profile = humps.decamelize(result["contactProfile"])
 
             return contact_profile
         except Exception as e:
@@ -563,8 +572,13 @@ class MCPMarketingCollection:
             first_name = data_collect_dataset.pop("first_name", None)
             last_name = data_collect_dataset.pop("last_name", None)
             data_collect_dataset.update(
-                {"sales_rep": self.setting.get("sales_rep", "Marketing Team")}
+                {
+                    "sales_rep": self.setting.get("sales_rep", "Marketing Team"),
+                }
             )
+            variables = {
+                "email": email,
+            }
 
             result = self._execute_graphql_query(
                 "ai_marketing_graphql",
@@ -574,12 +588,10 @@ class MCPMarketingCollection:
                     "email": email,
                 },
             )
-
             contact_uuid = None
-            if result["contactProfileList"]["total"] > 0:
-                contact_profile = humps.decamelize(
-                    result["contactProfileList"]["contactProfileList"][0]
-                )
+
+            if result["total"] > 0:
+                contact_profile = humps.decamelize(result["contactProfileList"][0])
                 contact_uuid = contact_profile["contact_uuid"]
 
             variables = {
@@ -599,9 +611,7 @@ class MCPMarketingCollection:
                 "Mutation",
                 variables,
             )
-            contact_profile = humps.decamelize(
-                result["insertUpdateContactProfile"]["contactProfile"]
-            )
+            contact_profile = humps.decamelize(result["contactProfile"])
             self.logger.info(f"Contact Profile: {contact_profile}")
 
             return {
@@ -635,9 +645,7 @@ class MCPMarketingCollection:
                 "Mutation",
                 variables,
             )
-            contact_request = humps.decamelize(
-                result["insertUpdateContactRequest"]["contactRequest"]
-            )
+            contact_request = humps.decamelize(result["contactRequest"])
 
             return {"request_uuid": contact_request["request_uuid"]}
         except Exception as e:
@@ -684,8 +692,9 @@ class MCPMarketingCollection:
                 "Mutation",
                 variables,
             )
-            if result.get("createDraftOrder", {}).get("draftOrder"):
-                return result.get("createDraftOrder", {}).get("draftOrder")
+
+            if result.get("draftOrder"):
+                return humps.decamelize(result["draftOrder"])
             return None
         except Exception as e:
             log = traceback.format_exc()
@@ -744,7 +753,7 @@ class MCPMarketingCollection:
                 variables,
             )
             if result.get("customer"):
-                return result.get("customer")
+                return humps.decamelize(result["customer"])
             return None
         except Exception as e:
             log = traceback.format_exc()
