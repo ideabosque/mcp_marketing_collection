@@ -487,11 +487,24 @@ class MCPMarketingCollection:
                     "updatedBy": "Admin",
                 }
             )
+            # Remove None or empty string values to avoid DynamoDB validation errors
+            # Special handling for contactUuid - completely remove it if not valid
+            self.logger.info(f"Variables before filtering: {variables}")
+            mutation_variables = {}
+            for k, v in variables.items():
+                # Skip None, empty strings, or empty lists
+                if v in (None, "", []):
+                    continue
+                # Special check for contactUuid - must be non-empty after stripping
+                if k == "contactUuid" and (not v or not str(v).strip()):
+                    continue
+                mutation_variables[k] = v
+            self.logger.info(f"Variables after filtering: {mutation_variables}")
             result = self._execute_graphql_query(
                 "ai_marketing_graphql",
                 "insertUpdateContactProfile",
                 "Mutation",
-                variables,
+                mutation_variables,
             )
             contact_profile = humps.decamelize(result["contactProfile"])
 
