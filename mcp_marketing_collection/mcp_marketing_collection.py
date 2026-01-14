@@ -639,7 +639,7 @@ class MCPMarketingCollection:
                     }
                 )
             variables = {
-                "shop": self.endpoint_id,
+                "shop": self.part_id,
                 "email": email,
                 "lineItems": line_items,
                 "shippingAddress": shipping_address,
@@ -680,7 +680,7 @@ class MCPMarketingCollection:
             self.logger.info(f"Contact Profile: {contact_profile}")
 
             variables = {
-                "shop": self.endpoint_id,
+                "shop": self.part_id,
                 "email": email,
                 "firstName": first_name,
                 "LastName": last_name,
