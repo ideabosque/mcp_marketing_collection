@@ -353,6 +353,7 @@ class MCPMarketingCollection:
             context = {
                 "endpoint_id": self.endpoint_id,
                 "part_id": self.part_id,
+                "partition_key": f"{self.endpoint_id}#{self.part_id}",
                 "setting": self.setting,
                 "logger": self.logger,
             }
