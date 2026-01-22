@@ -10,8 +10,8 @@ import traceback
 from typing import Any, Dict
 
 import boto3
+import httpx
 import humps
-
 from silvaengine_utility.graphql import Graphql
 from silvaengine_utility.serializer import Serializer
 
@@ -350,24 +350,39 @@ class MCPMarketingCollection:
         variables: Dict[str, Any],
     ) -> Dict[str, Any]:
         try:
-            context = {
-                "endpoint_id": self.endpoint_id,
-                "part_id": self.part_id,
-                "partition_key": f"{self.endpoint_id}#{self.part_id}",
-                "setting": self.setting,
-                "logger": self.logger,
+            schema = Graphql.get_graphql_schema(
+                module_name="ai_marketing_engine",
+                class_name="AIMarketingEngine",
+            )
+
+            query = Graphql.generate_graphql_operation(
+                operation_name, operation_type, schema
+            )
+
+            payload = Serializer.json_dumps({"query": query, "variables": variables})
+
+            headers = {
+                "x-api-key": self.setting.get("x_api_key"),
+                "Part-Id": self.part_id,
+                "Content-Type": "application/json",
             }
 
-            result = Graphql.request_graphql(
-                context=context,
-                module_name="ai_marketing_engine",
-                function_name="ai_marketing_graphql",
-                graphql_operation_type=operation_type,
-                graphql_operation_name=operation_name,
-                class_name="AIMarketingEngine",
-                variables=variables,
-            )
-            return result
+            with httpx.Client(http2=True) as client:
+                response = client.post(
+                    self.setting.get("ai_marketing_graphql_endpoint").format(
+                        endpoint_id=self.endpoint_id
+                    ),
+                    headers=headers,
+                    content=payload,
+                )
+
+            result = response.json()
+
+            if "errors" in result:
+                error_message = result["errors"][0].get("message", "GraphQL error")
+                raise Exception(f"GraphQL error: {error_message}")
+
+            return result.get("data", {}).get(operation_name)
         except Exception as e:
             log = traceback.format_exc()
             self.logger.error(log)
