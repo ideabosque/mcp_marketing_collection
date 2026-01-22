@@ -9,11 +9,13 @@ import re
 import traceback
 from typing import Any, Dict
 
-import boto3
 import httpx
 import humps
+
 from silvaengine_utility.graphql import Graphql
 from silvaengine_utility.serializer import Serializer
+
+from .graphql_module import GraphQLModule
 
 MCP_CONFIGURATION = {
     "tools": [
@@ -309,8 +311,7 @@ class MCPMarketingCollection:
         self.setting = setting
         self._endpoint_id = None
         self._part_id = None
-        self._schemas = {}
-        self._aws_lambda = self._initialize_aws_lambda_client(**setting)
+        self._graphql_modules = {}
 
     @property
     def endpoint_id(self) -> str | None:
@@ -328,19 +329,24 @@ class MCPMarketingCollection:
     def part_id(self, value: str):
         self._part_id = value
 
-    def _initialize_aws_lambda_client(self, **setting: Dict[str, Any]) -> boto3.client:
-        region_name = setting.get("region_name")
-        aws_access_key_id = setting.get("aws_access_key_id")
-        aws_secret_access_key = setting.get("aws_secret_access_key")
-        if region_name and aws_access_key_id and aws_secret_access_key:
-            return boto3.client(
-                "lambda",
-                region_name=region_name,
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
+    def get_graphql_module(self, module_name: str) -> GraphQLModule | None:
+        """Get a GraphQL module by name."""
+        if not self._graphql_modules.get(module_name):
+            self._graphql_modules[module_name] = GraphQLModule(
+                endpoint_id=self.endpoint_id,
+                module_name=module_name,
+                class_name=self.setting.get("graphql_modules", {})
+                .get(module_name, {})
+                .get("class_name"),
+                endpoint=self.setting.get("graphql_modules", {})
+                .get(module_name, {})
+                .get("endpoint"),
+                x_api_key=self.setting.get("graphql_modules", {})
+                .get(module_name, {})
+                .get("x_api_key"),
             )
-        else:
-            return boto3.client("lambda")
+
+        return self._graphql_modules.get(module_name)
 
     def _execute_graphql_query(
         self,
@@ -348,30 +354,25 @@ class MCPMarketingCollection:
         operation_name: str,
         operation_type: str,
         variables: Dict[str, Any],
+        module_name: str = "ai_marketing_engine",
     ) -> Dict[str, Any]:
         try:
-            schema = Graphql.get_graphql_schema(
-                module_name="ai_marketing_engine",
-                class_name="AIMarketingEngine",
-            )
-
+            graphql_module = self.get_graphql_module(module_name)
             query = Graphql.generate_graphql_operation(
-                operation_name, operation_type, schema
+                operation_name, operation_type, graphql_module.schema
             )
 
             payload = Serializer.json_dumps({"query": query, "variables": variables})
 
             headers = {
-                "x-api-key": self.setting.get("x_api_key"),
+                "x-api-key": graphql_module.x_api_key,
                 "Part-Id": self.part_id,
                 "Content-Type": "application/json",
             }
 
             with httpx.Client(http2=True) as client:
                 response = client.post(
-                    self.setting.get("ai_marketing_graphql_endpoint").format(
-                        endpoint_id=self.endpoint_id
-                    ),
+                    graphql_module.endpoint,
                     headers=headers,
                     content=payload,
                 )
