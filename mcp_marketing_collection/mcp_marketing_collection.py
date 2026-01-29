@@ -676,6 +676,7 @@ class MCPMarketingCollection:
                 "createDraftOrder",
                 "Mutation",
                 variables,
+                module_name="shopify_app_engine",
             )
 
             if result.get("draftOrder"):
@@ -736,6 +737,7 @@ class MCPMarketingCollection:
                 "customer",
                 "Query",
                 variables,
+                module_name="shopify_app_engine",
             )
             if result.get("customer"):
                 return humps.decamelize(result["customer"])
