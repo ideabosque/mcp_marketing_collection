@@ -398,16 +398,14 @@ class MCPMarketingCollection:
             self.logger.info(f"Arguments: {arguments}")
 
             if arguments.get("place_uuid"):
-                result = self._execute_graphql_query(
+                place = self._execute_graphql_query(
                     "ai_marketing_graphql",
                     "place",
                     "Query",
                     {"placeUuid": arguments["place_uuid"]},
                 )
 
-                if result and "place" in result:
-                    return humps.decamelize(result.get("place", {}))
-                return {}
+                return humps.decamelize(place)
 
             assert all(
                 arguments.get(k) for k in ["region", "latitude", "longitude", "address"]
@@ -723,16 +721,18 @@ class MCPMarketingCollection:
                         }
                     }
                 )
-            result = self._execute_graphql_query(
+            customer = self._execute_graphql_query(
                 "shopify_app_engine_graphql",
                 "customer",
                 "Query",
                 variables,
                 module_name="shopify_app_engine",
             )
-            if result.get("customer"):
-                return humps.decamelize(result["customer"])
-            return None
+
+            if customer["addresses"][0]["address1"]:
+                return humps.decamelize(customer)
+
+            return contact_profile
         except Exception as e:
             log = traceback.format_exc()
             self.logger.error(log)
