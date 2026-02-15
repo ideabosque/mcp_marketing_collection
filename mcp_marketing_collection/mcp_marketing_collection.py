@@ -5,7 +5,6 @@ from __future__ import annotations
 __author__ = "bibow"
 
 import logging
-import re
 import traceback
 from typing import Any, Dict
 
@@ -129,111 +128,6 @@ MCP_CONFIGURATION = {
             },
             "annotations": None,
         },
-        {
-            "name": "place_shopify_draft_order",
-            "description": "Creates a draft order in Shopify for a customer identified by email. Accepts an array of line items (each with variant_id and quantity), along with optional shipping_address and billing_address objects. The draft order can be reviewed and modified before being finalized in Shopify. Returns the complete draft order object from Shopify, or None if creation fails.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "contact": {
-                        "type": "object",
-                        "description": "Contact information",
-                        "properties": {"email": {"type": "string"}},
-                        "required": ["email"],
-                    },
-                    "shipping_address": {
-                        "type": "object",
-                        "description": "Shipping address information",
-                        "properties": {
-                            "address1": {"type": "string"},
-                            "address2": {"type": "string"},
-                            "city": {"type": "string"},
-                            "province_code": {"type": "string"},
-                            "province": {"type": "string"},
-                            "zip": {"type": "string"},
-                            "country": {"type": "string"},
-                            "country_code": {"type": "string"},
-                            "company": {"type": "string"},
-                            "first_name": {"type": "string"},
-                            "last_name": {"type": "string"},
-                            "phone": {"type": "string"},
-                        },
-                    },
-                    "billing_address": {
-                        "type": "object",
-                        "description": "Billing address information",
-                        "properties": {
-                            "address1": {"type": "string"},
-                            "address2": {"type": "string"},
-                            "city": {"type": "string"},
-                            "province_code": {"type": "string"},
-                            "province": {"type": "string"},
-                            "zip": {"type": "string"},
-                            "country": {"type": "string"},
-                            "country_code": {"type": "string"},
-                            "company": {"type": "string"},
-                            "first_name": {"type": "string"},
-                            "last_name": {"type": "string"},
-                            "phone": {"type": "string"},
-                        },
-                    },
-                    "items": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "variant_id": {"type": "string"},
-                                "quantity": {"type": "integer"},
-                            },
-                        },
-                        "description": "Array of line items for the draft order",
-                    },
-                },
-                "required": ["contact"],
-            },
-            "annotations": None,
-        },
-        {
-            "name": "get_shopify_customer",
-            "description": "Retrieves or creates a Shopify customer record based on email and address information. First creates or updates the contact profile in the marketing system (associating it with the place_uuid from the address), then fetches the corresponding customer data from Shopify including their address details, purchase history, and account information. Returns the customer object from Shopify, or None if not found.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "contact": {
-                        "type": "object",
-                        "description": "Contact information",
-                        "properties": {
-                            "email": {"type": "string"},
-                            "first_name": {"type": "string"},
-                            "last_name": {"type": "string"},
-                            "phone": {"type": "string"},
-                        },
-                        "required": ["email"],
-                    },
-                    "address": {
-                        "type": "object",
-                        "description": "Customer address information",
-                        "properties": {
-                            "place_uuid": {"type": "string"},
-                            "address1": {"type": "string"},
-                            "address2": {"type": "string"},
-                            "city": {"type": "string"},
-                            "province_code": {"type": "string"},
-                            "province": {"type": "string"},
-                            "zip": {"type": "string"},
-                            "country": {"type": "string"},
-                            "country_code": {"type": "string"},
-                            "company": {"type": "string"},
-                            "first_name": {"type": "string"},
-                            "last_name": {"type": "string"},
-                            "phone": {"type": "string"},
-                        },
-                    },
-                },
-                "required": ["contact"],
-            },
-            "annotations": None,
-        },
     ],
     "resources": [],
     "prompts": [],
@@ -268,22 +162,6 @@ MCP_CONFIGURATION = {
             "module_name": "mcp_marketing_collection",
             "class_name": "MCPMarketingCollection",
             "function_name": "submit_request",
-            "return_type": "text",
-        },
-        {
-            "type": "tool",
-            "name": "place_shopify_draft_order",
-            "module_name": "mcp_marketing_collection",
-            "class_name": "MCPMarketingCollection",
-            "function_name": "place_shopify_draft_order",
-            "return_type": "text",
-        },
-        {
-            "type": "tool",
-            "name": "get_shopify_customer",
-            "module_name": "mcp_marketing_collection",
-            "class_name": "MCPMarketingCollection",
-            "function_name": "get_shopify_customer",
             "return_type": "text",
         },
     ],
@@ -359,7 +237,7 @@ class MCPMarketingCollection:
         try:
             graphql_module = self.get_graphql_module(module_name)
             query = GraphqlSchemaModel.get_schema(
-                endpoint_id=GraphQLModule.endpoint_id,
+                endpoint_id=graphql_module.endpoint_id,
                 operation_type=operation_type,
                 operation_name=operation_name,
                 module_name=module_name,
@@ -379,7 +257,7 @@ class MCPMarketingCollection:
                 "Content-Type": "application/json",
             }
 
-            with httpx.Client(http2=True) as client:
+            with httpx.Client(http2=True, timeout=httpx.Timeout(30.0)) as client:
                 response = client.post(
                     graphql_module.endpoint,
                     headers=headers,
@@ -407,16 +285,14 @@ class MCPMarketingCollection:
             self.logger.info(f"Arguments: {arguments}")
 
             if arguments.get("place_uuid"):
-                result = self._execute_graphql_query(
+                place = self._execute_graphql_query(
                     "ai_marketing_graphql",
                     "place",
                     "Query",
                     {"placeUuid": arguments["place_uuid"]},
                 )
 
-                if result and "place" in result:
-                    return humps.decamelize(result.get("place", {}))
-                return {}
+                return humps.decamelize(place)
 
             assert all(
                 arguments.get(k) for k in ["region", "latitude", "longitude", "address"]
@@ -633,115 +509,6 @@ class MCPMarketingCollection:
             contact_request = humps.decamelize(result["contactRequest"])
 
             return {"request_uuid": contact_request["request_uuid"]}
-        except Exception as e:
-            log = traceback.format_exc()
-            self.logger.error(log)
-            raise e
-
-    # * MCP Function.
-    def place_shopify_draft_order(self, **arguments: Dict[str, Any]) -> str:
-        """Place a Shopify draft order."""
-        try:
-            contact = arguments["contact"]
-            email = contact["email"]
-            shipping_address = arguments.get("shipping_address")
-            billing_address = arguments.get("billing_address")
-
-            items = arguments.get("items", [])
-            line_items = []
-            for item in items:
-                if item.get("variant_id") is None:
-                    continue
-                variant_id = None
-                match = re.search(r"\d+", item.get("variant_id"))
-                if match:
-                    variant_id = match.group()
-                if variant_id is None:
-                    continue
-                line_items.append(
-                    {
-                        "variant_id": variant_id,
-                        "quantity": item.get("quantity", 1),
-                    }
-                )
-            variables = {
-                "shop": self.part_id,
-                "email": email,
-                "lineItems": line_items,
-                "shippingAddress": shipping_address,
-                "billingAddress": billing_address,
-            }
-            result = self._execute_graphql_query(
-                "shopify_app_engine_graphql",
-                "createDraftOrder",
-                "Mutation",
-                variables,
-                module_name="shopify_app_engine",
-            )
-
-            if result.get("draftOrder"):
-                return humps.decamelize(result["draftOrder"])
-            return None
-        except Exception as e:
-            log = traceback.format_exc()
-            self.logger.error(log)
-            raise e
-
-    # * MCP Function.
-    def get_shopify_customer(self, **arguments: Dict[str, Any]) -> str:
-        """get a Shopify customer."""
-        try:
-            contact = arguments["contact"]
-            email = contact["email"]
-            first_name = contact.get("first_name")
-            last_name = contact.get("last_name")
-            phone = contact.get("phone")
-            address = arguments.get("address", {})
-
-            contact_profile = self.get_contact_profile(
-                **{
-                    "contact": contact,
-                    "place": {"place_uuid": address.get("place_uuid")},
-                }
-            )
-            self.logger.info(f"Contact Profile: {contact_profile}")
-
-            variables = {
-                "shop": self.part_id,
-                "email": email,
-                "firstName": first_name,
-                "LastName": last_name,
-                "phone": phone,
-            }
-            if address:
-                variables.update(
-                    {
-                        "address": {
-                            "address1": address.get("address1"),
-                            "address2": address.get("address2"),
-                            "city": address.get("city"),
-                            "province_code": address.get("province_code"),
-                            "province": address.get("province"),
-                            "zip": address.get("zip"),
-                            "country": address.get("country"),
-                            "country_code": address.get("country_code"),
-                            "company": address.get("company"),
-                            "first_name": address.get("first_name"),
-                            "last_name": address.get("last_name"),
-                            "phone": address.get("phone"),
-                        }
-                    }
-                )
-            result = self._execute_graphql_query(
-                "shopify_app_engine_graphql",
-                "customer",
-                "Query",
-                variables,
-                module_name="shopify_app_engine",
-            )
-            if result.get("customer"):
-                return humps.decamelize(result["customer"])
-            return None
         except Exception as e:
             log = traceback.format_exc()
             self.logger.error(log)
