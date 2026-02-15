@@ -257,7 +257,7 @@ class MCPMarketingCollection:
                 "Content-Type": "application/json",
             }
 
-            with httpx.Client(http2=True) as client:
+            with httpx.Client(http2=True, timeout=httpx.Timeout(30.0)) as client:
                 response = client.post(
                     graphql_module.endpoint,
                     headers=headers,
