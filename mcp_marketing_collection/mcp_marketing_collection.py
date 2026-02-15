@@ -10,7 +10,7 @@ from typing import Any, Dict
 
 import httpx
 import humps
-
+from silvaengine_dynamodb_base.models import GraphqlSchemaModel
 from silvaengine_utility.graphql import Graphql
 from silvaengine_utility.serializer import Serializer
 
@@ -236,9 +236,18 @@ class MCPMarketingCollection:
     ) -> Dict[str, Any]:
         try:
             graphql_module = self.get_graphql_module(module_name)
-            query = Graphql.generate_graphql_operation(
-                operation_name, operation_type, graphql_module.schema
+            query = GraphqlSchemaModel.get_schema(
+                endpoint_id=graphql_module.endpoint_id,
+                operation_type=operation_type,
+                operation_name=operation_name,
+                module_name=module_name,
+                enable_preferred_custom_schema=True,
             )
+
+            if not query:
+                query = Graphql.generate_graphql_operation(
+                    operation_name, operation_type, graphql_module.schema
+                )
 
             payload = Serializer.json_dumps({"query": query, "variables": variables})
 
