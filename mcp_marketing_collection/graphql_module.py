@@ -28,12 +28,17 @@ class GraphQLModule:
             class_name: Optional class name for schema generation
             endpoint: Optional endpoint URL template with {endpoint_id} placeholder
         """
-        self.endpoint_id = endpoint_id
+        self._endpoint_id = endpoint_id
         self._module_name = module_name
         self._class_name = class_name
         self._endpoint = endpoint.format(endpoint_id=endpoint_id) if endpoint else None
         self._x_api_key = x_api_key
         self._schema = None
+
+    @property
+    def endpoint_id(self) -> str:
+        """Get the endpoint identifier."""
+        return self._endpoint_id
 
     @property
     def module_name(self) -> str | None:
