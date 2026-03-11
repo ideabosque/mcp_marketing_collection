@@ -10,6 +10,7 @@ from typing import Any, Dict
 
 import httpx
 import humps
+
 from silvaengine_dynamodb_base.models import GraphqlSchemaModel
 from silvaengine_utility.graphql import Graphql
 from silvaengine_utility.serializer import Serializer
@@ -375,7 +376,7 @@ class MCPMarketingCollection:
                     [
                         contact_profile.get("first_name") == contact.get("first_name"),
                         contact_profile.get("last_name") == contact.get("last_name"),
-                        contact_profile["place"].get("place_uuid")
+                        contact_profile.get("place", {}).get("place_uuid")
                         == place.get("place_uuid"),
                     ]
                 ):
