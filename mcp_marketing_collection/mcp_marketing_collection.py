@@ -121,7 +121,6 @@ MCP_CONFIGURATION = {
                     },
                 },
                 "required": [
-                    "place_uuid",
                     "contact_uuid",
                     "request_title",
                     "request_detail",
@@ -495,10 +494,12 @@ class MCPMarketingCollection:
             self.logger.info(f"Arguments: {arguments}")
 
             variables = {
-                "placeUuid": arguments["place_uuid"],
+                "placeUuid": arguments.get("place_uuid"),
                 "contactUuid": arguments["contact_uuid"],
                 "requestTitle": arguments["request_title"],
                 "requestDetail": arguments["request_detail"],
+                "sourceEmail": self.setting.get("source_email"),
+                "notificationEmails": self.setting.get("notification_emails", []),
                 "updatedBy": "Admin",
             }
             result = self._execute_graphql_query(
