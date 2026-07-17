@@ -236,13 +236,23 @@ class MCPMarketingCollection:
     ) -> Dict[str, Any]:
         try:
             graphql_module = self.get_graphql_module(module_name)
-            query = GraphqlSchemaModel.get_schema(
-                endpoint_id=graphql_module.endpoint_id,
-                operation_type=operation_type,
-                operation_name=operation_name,
-                module_name=module_name,
-                enable_preferred_custom_schema=True,
-            )
+            try:
+                query = GraphqlSchemaModel.get_schema(
+                    endpoint_id=graphql_module.endpoint_id,
+                    operation_type=operation_type,
+                    operation_name=operation_name,
+                    module_name=module_name,
+                    enable_preferred_custom_schema=True,
+                )
+            except Exception as schema_error:
+                # No stored schema for this endpoint/operation (e.g. the
+                # se-graphql-schemas table has no matching row). Fall back to
+                # generating the operation from the module's own schema.
+                self.logger.info(
+                    f"No stored GraphQL schema for {module_name}/{operation_name}, "
+                    f"generating from module schema. ({schema_error})"
+                )
+                query = None
 
             if not query:
                 query = Graphql.generate_graphql_operation(
