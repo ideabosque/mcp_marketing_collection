@@ -255,8 +255,23 @@ class MCPMarketingCollection:
                 query = None
 
             if not query:
+                if graphql_module.schema is None:
+                    raise Exception(
+                        f"No GraphQL schema available for module '{module_name}'. "
+                        f"Add a 'graphql_modules.{module_name}' entry (class_name, "
+                        f"endpoint, x_api_key) to this tool's setting, or store a "
+                        f"schema in se-graphql-schemas for endpoint_id "
+                        f"'{graphql_module.endpoint_id}'."
+                    )
                 query = Graphql.generate_graphql_operation(
                     operation_name, operation_type, graphql_module.schema
+                )
+
+            if not graphql_module.endpoint:
+                raise Exception(
+                    f"No GraphQL endpoint configured for module '{module_name}'. "
+                    f"Add 'graphql_modules.{module_name}.endpoint' to this tool's "
+                    f"setting."
                 )
 
             payload = Serializer.json_dumps({"query": query, "variables": variables})
