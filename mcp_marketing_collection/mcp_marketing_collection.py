@@ -190,14 +190,6 @@ class MCPMarketingCollection:
         self._endpoint_id = None
         self._part_id = None
         self._graphql_modules = {}
-        # silvaengine_gateway JWT Bearer auth. When ``gateway_base_url`` is
-        # configured the client logs in to the gateway to obtain a JWT and sends
-        # ``Authorization: Bearer <token>`` instead of the AWS API Gateway
-        # ``x-api-key`` header — so the tool can call the instance's own engines.
-        self._gateway_base_url = setting.get("gateway_base_url")
-        self._token_username = setting.get("token_username")
-        self._token_password = setting.get("token_password")
-        self._gateway_token = setting.get("gateway_token")
 
     @property
     def endpoint_id(self) -> str | None:
@@ -216,35 +208,33 @@ class MCPMarketingCollection:
         self._part_id = value
 
     def get_graphql_module(self, module_name: str) -> GraphQLModule | None:
-        """Get a GraphQL module by name."""
+        """Get a GraphQL module by name.
+
+        Each module's auth is configured individually under
+        ``graphql_modules.<module_name>``. A module may use either:
+
+            - AWS API Gateway ``x_api_key`` auth, or
+            - silvaengine_gateway JWT Bearer auth (``gateway_base_url`` /
+              ``token_username`` / ``token_password`` / ``gateway_token``).
+        """
         if not self._graphql_modules.get(module_name):
+            module_setting = (
+                self.setting.get("graphql_modules", {}).get(module_name, {}) or {}
+            )
+
             self._graphql_modules[module_name] = GraphQLModule(
                 endpoint_id=self.endpoint_id,
                 module_name=module_name,
-                class_name=self.setting.get("graphql_modules", {})
-                .get(module_name, {})
-                .get("class_name"),
-                endpoint=self.setting.get("graphql_modules", {})
-                .get(module_name, {})
-                .get("endpoint"),
-                x_api_key=self.setting.get("graphql_modules", {})
-                .get(module_name, {})
-                .get("x_api_key"),
+                class_name=module_setting.get("class_name"),
+                endpoint=module_setting.get("endpoint"),
+                x_api_key=module_setting.get("x_api_key"),
+                gateway_base_url=module_setting.get("gateway_base_url"),
+                token_username=module_setting.get("token_username"),
+                token_password=module_setting.get("token_password"),
+                gateway_token=module_setting.get("gateway_token"),
             )
 
         return self._graphql_modules.get(module_name)
-
-    def get_gateway_token(self) -> str | None:
-        """Obtain a JWT Bearer token for the silvaengine_gateway.
-
-        Returns ``None`` when no gateway auth is configured (the client then
-        falls back to AWS API Gateway ``x-api-key`` auth). A successfully issued
-        token is cached on the instance and reused on subsequent calls.
-        """
-        if not self._gateway_base_url:
-            return None
-        if self._gateway_token:
-            return self._gateway_token
         if not (self._token_username and self._token_password):
             return None
 
@@ -293,8 +283,9 @@ class MCPMarketingCollection:
                     raise Exception(
                         f"No GraphQL schema available for module '{module_name}'. "
                         f"Add a 'graphql_modules.{module_name}' entry (class_name, "
-                        f"endpoint, x_api_key) to this tool's setting, or store a "
-                        f"schema in se-graphql-schemas for endpoint_id "
+                        f"endpoint, and either x_api_key or gateway_base_url/"
+                        f"token_username/token_password) to this tool's setting, "
+                        f"or store a schema in se-graphql-schemas for endpoint_id "
                         f"'{graphql_module.endpoint_id}'."
                     )
                 query = Graphql.generate_graphql_operation(
@@ -310,9 +301,10 @@ class MCPMarketingCollection:
 
             payload = Serializer.json_dumps({"query": query, "variables": variables})
 
-            # Prefer gateway JWT Bearer auth when configured; otherwise fall back
-            # to AWS API Gateway x-api-key auth.
-            token = self.get_gateway_token()
+            # Auth is configured per module. JWT Bearer auth (via
+            # silvaengine_gateway) takes precedence when configured; otherwise
+            # the AWS API Gateway ``x-api-key`` header is used.
+            token = graphql_module.get_gateway_token()
             if token:
                 headers = {
                     "Authorization": f"Bearer {token}",
